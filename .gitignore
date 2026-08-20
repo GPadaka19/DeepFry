@@ -1,0 +1,30 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+artifacts/
+.verify/
+.verify-obj/
+
+# Visual Studio and user-specific files
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.rsuser
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# Local secrets and development overrides
+LabManagement.Client/.env
+*.env.local
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+*.swp
+Thumbs.db
+Desktop.ini
