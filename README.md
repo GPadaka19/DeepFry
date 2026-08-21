@@ -167,6 +167,29 @@ Get-Service -Name "LabManagement Client"
 Restart-Service -Name "LabManagement Client"
 ```
 
+### Reset password Host yang terlupa
+
+Password Host tetap sama setelah aplikasi diperbarui karena hash password dan
+konfigurasi lab disimpan di
+`C:\ProgramData\LabManagement\host-settings.json`, bukan di folder EXE.
+Password asli tidak dapat dibaca kembali dari hash tersebut.
+
+Jika password terlupa, tutup aplikasi Host, buka PowerShell sebagai
+Administrator, lalu backup file konfigurasi dengan perintah berikut:
+
+```powershell
+$settingsPath = 'C:\ProgramData\LabManagement\host-settings.json'
+$backupName = 'host-settings.backup-' + `
+  (Get-Date -Format 'yyyyMMdd-HHmmss') + '.json'
+
+Rename-Item -LiteralPath $settingsPath -NewName $backupName
+```
+
+Jalankan kembali `LabManagement.Host.exe`. Host akan meminta pembuatan password
+baru seperti pada penggunaan pertama. Nama lab juga perlu diisi ulang melalui
+**Lab Settings**. File konfigurasi lama hanya diubah namanya sehingga masih
+dapat dipulihkan jika diperlukan.
+
 ## Troubleshooting
 
 Dari Host, pastikan Client dapat dijangkau:
