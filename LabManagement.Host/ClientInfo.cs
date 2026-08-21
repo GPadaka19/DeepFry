@@ -49,8 +49,24 @@ public sealed class ClientInfo : INotifyPropertyChanged
     public UwfState UwfState
     {
         get => _uwfState;
-        set => SetField(ref _uwfState, value);
+        set
+        {
+            if (!SetField(ref _uwfState, value))
+                return;
+
+            PropertyChanged?.Invoke(
+                this,
+                new PropertyChangedEventArgs(nameof(UwfStatusText)));
+        }
     }
+
+    public string UwfStatusText => _uwfState switch
+    {
+        UwfState.Locked => "Protected",
+        UwfState.Unlocked => "Un-protected",
+        UwfState.Checking => "Checking...",
+        _ => "Unknown"
+    };
 
     public string LastResult
     {
@@ -102,17 +118,18 @@ public sealed class ClientInfo : INotifyPropertyChanged
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    private void SetField<T>(
+    private bool SetField<T>(
         ref T field,
         T value,
         [CallerMemberName] string? propertyName = null)
     {
         if (EqualityComparer<T>.Default.Equals(field, value))
-            return;
+            return false;
 
         field = value;
         PropertyChanged?.Invoke(
             this,
             new PropertyChangedEventArgs(propertyName));
+        return true;
     }
 }

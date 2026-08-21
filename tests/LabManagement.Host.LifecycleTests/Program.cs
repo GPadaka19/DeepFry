@@ -32,6 +32,7 @@ else
     TestPasswordSetupSubmission();
     TestHostPasswordManager();
     TestUwfStatusResultFormatting();
+    TestUwfStatusColumnFormatting();
     TestUwfStatusParserUsesCurrentDriveCVolumeState();
     await TestCommandDispatcherAsync();
     await TestHostDiscoversClientAsync();
@@ -246,6 +247,28 @@ static void TestUwfStatusResultFormatting()
         "UWF status result was not reduced to On, Off, or Unknown.");
 }
 
+static void TestUwfStatusColumnFormatting()
+{
+    var client = new ClientInfo();
+    var changedProperties = new List<string?>();
+    client.PropertyChanged += (_, args) =>
+        changedProperties.Add(args.PropertyName);
+
+    client.UwfState = UwfState.Locked;
+    bool protectedStateIsDisplayed =
+        client.UwfStatusText == "Protected" &&
+        changedProperties.Contains("UwfStatusText");
+
+    changedProperties.Clear();
+    client.UwfState = UwfState.Unlocked;
+
+    Assert(
+        protectedStateIsDisplayed &&
+        client.UwfStatusText == "Un-protected" &&
+        changedProperties.Contains("UwfStatusText"),
+        "The Host UWF column does not expose the current Volume state label.");
+}
+
 static void TestUwfStatusParserUsesCurrentDriveCVolumeState()
 {
     const string capturedProtectedOutput = """
@@ -418,6 +441,11 @@ static void TestMainWindowLayout()
             Assert(
                 grid.RowHeaderWidth == 0,
                 "DataGrid row header still creates a left-side gutter.");
+            Assert(
+                grid.Columns[4] is DataGridTextColumn uwfColumn &&
+                uwfColumn.Binding is System.Windows.Data.Binding uwfBinding &&
+                uwfBinding.Path.Path == "UwfStatusText",
+                "The UWF column is not bound to the current Volume state text.");
             Assert(
                 grid.Columns[5] is DataGridTemplateColumn lastResult &&
                 lastResult.Width.UnitType == DataGridLengthUnitType.Star,
