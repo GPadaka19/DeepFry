@@ -8,7 +8,8 @@ Build a lightweight Windows laboratory management system consisting of:
   - Runs on the presentation/lecturer PC in each lab.
   - Used exclusively by UPT Lab staff.
   - Acts as the central management/control application.
-  - Listens for Client connections on TCP port `5020`.
+  - Uses its local `10.x.x.90` address to scan Client IPs `.1` through `.89`.
+  - Connects outbound to Client listeners on TCP port `5020`.
   - Displays all connected laboratory PCs.
   - Eventually sends administrative commands to Clients.
 
@@ -16,12 +17,12 @@ Build a lightweight Windows laboratory management system consisting of:
   - Runs on every student PC.
   - Runs as a lightweight background application/service.
   - Automatically identifies itself using Windows `Environment.MachineName`.
-  - Automatically discovers the Host IP from its own IPv4 address.
+  - Listens for the Host on TCP port `5020`.
   - Lab network convention:
     - `10.xx.x.x`
     - Host always uses `.90`
     - Example: `10.22.4.13` → Host `10.22.4.90`
-  - Maintains a persistent TCP connection to Host.
+  - Maintains the TCP session initiated by Host.
   - Sends periodic heartbeat.
   - Eventually executes UWF commands locally.
 
@@ -38,9 +39,8 @@ The application must remain lightweight and suitable for deployment across many 
              |                       |
              v                       v
      LabManagement.Host      LabManagement.Client
-        PC Host (.90)          Student PC
-        TCP : 5020             TCP connection
-             ^                       |
+        PC Host (.90)          Student PC (.1-.89)
+        subnet scanner  -----------> TCP listener : 5020
              |<----------------------|
                 REGISTER / HEARTBEAT
 ```
@@ -64,8 +64,8 @@ The current lifecycle implementation has already been fixed and regression-teste
 
 Verified behavior:
 
-1. Client connects.
-2. Client sends REGISTER.
+1. Host discovers and connects to a Client listener.
+2. Client sends REGISTER on the accepted connection.
 3. Host creates active ClientInfo.
 4. Client sends HEARTBEAT every 2 seconds.
 5. Host updates `ClientInfo.LastHeartbeat`.
@@ -538,7 +538,7 @@ Komputer-04   Failed    ✗
 
 ## Status
 
-IN PROGRESS.
+DONE FOR THE CURRENT INTERNAL-LAB POLICY.
 
 Completed for Host application access:
 
@@ -549,13 +549,10 @@ Completed for Host application access:
   `C:\ProgramData\LabManagement\host-settings.json`.
 - The `Settings` button lets staff change the password after confirming the
   current password; no rebuild or republish is required.
-- Host creates a random per-lab Client Pairing Key. A Client proves possession
-  of that key with an HMAC-SHA256 response to a fresh Host challenge; the key
-  itself is never sent over TCP.
-
-For deployment, the UPT Lab staff copies the key using the `Client Pairing Key`
-button and supplies it to the Client installation script. The script stores it
-for the LocalSystem service with access limited to SYSTEM and Administrators.
+- Network pairing keys are intentionally not used. Client requires no secret,
+  `.env`, or per-PC configuration.
+- Client only accepts the explicit command allowlist, and its automatic
+  firewall rule restricts TCP 5020 to the local subnet.
 
 Do not implement Client-side command passwords.
 
@@ -583,11 +580,9 @@ Host application
 
 Client does not need an interactive password.
 
-However, Host → Client communication should eventually have a mechanism to prevent arbitrary machines on the LAN from issuing management commands.
-
-This should be addressed before production deployment.
-
-Do not use security-by-obscurity.
+Accepted risk: the transport is not authenticated or encrypted. This design is
+limited to the controlled internal lab network. Reintroducing authenticated
+transport later would be a new policy decision, not a hidden deployment step.
 
 ---
 
@@ -601,8 +596,8 @@ Completed:
 
 - Client uses the official .NET Windows Service lifetime when installed as a
   service named `LabManagement Client`.
-- A normal manual launch is rejected; Visual Studio debugging and the explicit
-  `--console` argument remain available for development.
+- A normal manual launch is supported and requires no argument or pairing key.
+- The published EXE requests Administrator privileges for UWF and firewall work.
 - `scripts\Install-LabManagementClient.ps1` installs the service as Automatic
   start and configures Windows Service recovery to restart after a failure.
 
@@ -662,19 +657,15 @@ Do not require manual setup for every Client.
 
 ## Status
 
-IN PROGRESS.
+DONE.
 
-Client now derives its Host address from the lab convention (`x.x.x.90`).
-`LABMANAGEMENT_HOST_IP` in the development `.env` file can override that
-address for a one-PC `127.0.0.1` test and is not needed in the real lab.
+Host derives Client targets from its own `10.x.x.90` interface and scans
+`.1` through `.89`. It also scans `127.0.0.1` for a one-PC development test.
 
 Host configuration should eventually support:
 
 ```text
 Lab Name
-TCP Port
-Host IP / subnet configuration if necessary
-Authentication settings
 ```
 
 Persist configuration locally.
@@ -683,14 +674,13 @@ Example:
 
 ```json
 {
-  "labName": "Lab 2.2.1",
-  "port": 5020
+  "labName": "Lab 2.2.1"
 }
 ```
 
 Client should require minimal/no manual configuration.
 
-The Host IP should remain automatically derivable from the Client's IPv4 address according to the established lab convention.
+TCP port remains fixed at `5020`; Client requires no local configuration.
 
 ---
 
@@ -781,7 +771,7 @@ Do NOT:
 
 - add unnecessary dependencies
 - introduce a database for Client state
-- use polling from Host to every Client
+- scan addresses outside the established `.1` through `.89` Client range
 - create a new TCP connection for every command
 - execute arbitrary commands received over the network
 - require manual configuration on every student PC
@@ -804,33 +794,8 @@ Prefer:
 
 # Immediate Next Task
 
-Implement **Phase 1 → Phase 5 only**.
-
-Specifically:
-
-1. Verify existing lifecycle tests.
-2. Introduce a clean shared protocol model.
-3. Implement robust newline-delimited JSON framing.
-4. Implement bidirectional communication over the existing TCP 5020 connection.
-5. Implement Host request/response correlation using `requestId`.
-6. Implement command timeout and cancellation.
-7. Add tests for:
-   - request/response
-   - multiple simultaneous requests
-   - timeout
-   - disconnected Client
-   - malformed message
-   - old connection sending messages after reconnect.
-
-DO NOT implement UWF commands yet.
-
-When Phase 5 is complete, report:
-
-- files changed
-- architecture changes
-- tests added
-- test results
-- build result
-- any remaining risks
-
-Then stop and wait for the next instruction.
+1. Validate Host `.90` scanning and Client inbound firewall behavior in a real lab.
+2. Validate UWF status, lock, and unlock on the production Windows image.
+3. Add production file logging plus optional service uninstall/update scripts.
+4. Decide whether the accepted unauthenticated-transport risk remains suitable
+   before deployment outside the controlled lab network.
