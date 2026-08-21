@@ -208,10 +208,11 @@ Jika gagal:
 
 UWF wajib diuji pada image Windows lab sebenarnya sebelum operasi massal.
 
-Kolom **UWF** pada Host mengikuti nilai `Filter state` dari bagian Current
-Session pada output `uwfmgr.exe get-config`: `ON` ditampilkan sebagai `On` dan
-`OFF` sebagai `Off`. Status kolom ini tidak bergantung pada hasil parsing
-volume C atau konfigurasi Next Session.
+Kolom **UWF** pada Host mengikuti `Volume state` drive `[C:]` dari bagian
+Current Session pada output `uwfmgr.exe get-config`: `Protected` ditampilkan
+sebagai `On`, sedangkan `Un-protected` atau `Unprotected` ditampilkan sebagai
+`Off`. Konfigurasi Next Session dan volume selain C tidak menentukan status
+kolom ini.
 
 Perintah Lock/Unlock hanya mengubah konfigurasi UWF dan tidak pernah melakukan
 restart otomatis. Untuk menerapkan perubahan, pilih PC target, klik

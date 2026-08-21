@@ -32,7 +32,7 @@ else
     TestPasswordSetupSubmission();
     TestHostPasswordManager();
     TestUwfStatusResultFormatting();
-    TestUwfStatusParserUsesUwfMgrLabels();
+    TestUwfStatusParserUsesCurrentDriveCVolumeState();
     await TestCommandDispatcherAsync();
     await TestHostDiscoversClientAsync();
     await TestHeartbeatTimeoutAndDisconnectAsync();
@@ -246,7 +246,7 @@ static void TestUwfStatusResultFormatting()
         "UWF status result was not reduced to On, Off, or Unknown.");
 }
 
-static void TestUwfStatusParserUsesUwfMgrLabels()
+static void TestUwfStatusParserUsesCurrentDriveCVolumeState()
 {
     const string capturedProtectedOutput = """
         Unified Write Filter Configuration Utility version 10.0.26200
@@ -269,7 +269,7 @@ static void TestUwfStatusParserUsesUwfMgrLabels()
 
         VOLUME SETTINGS
         Volume 38c97866-e219-45c5-a3fc-6e2630a87435 [C:]
-            Volume state:     Protected
+            Volume state:     Un-protected
             Volume ID:        38c97866-e219-45c5-a3fc-6e2630a87435
         """;
 
@@ -304,10 +304,18 @@ static void TestUwfStatusParserUsesUwfMgrLabels()
             Filter state:     ON
 
         VOLUME SETTINGS
-        Volume 00000000-0000-0000-0000-000000000000 [C:]
-            Volume state:     Unprotected
+        Volume 11111111-1111-1111-1111-111111111111 [D:]
+            Volume state:     Protected
 
-        Next Session Volume Settings
+        Volume 00000000-0000-0000-0000-000000000000 [C:]
+            Volume state:     Un-protected
+
+        Next Session Settings
+
+        FILTER SETTINGS
+            Filter state:     ON
+
+        VOLUME SETTINGS
         Volume 00000000-0000-0000-0000-000000000000 [C:]
             Volume state:     Protected
         """;
@@ -316,20 +324,35 @@ static void TestUwfStatusParserUsesUwfMgrLabels()
         disabledFilterOutput);
     UwfStatusPayload unprotectedVolumeStatus = UwfManager.ParseStatus(
         enabledFilterUnprotectedVolumeOutput);
+    UwfStatusPayload nextSessionOnlyStatus = UwfManager.ParseStatus(
+        """
+        Current Session Settings
+
+        FILTER SETTINGS
+            Filter state:     ON
+
+        Next Session Settings
+
+        VOLUME SETTINGS
+        Volume 00000000-0000-0000-0000-000000000000 [C:]
+            Volume state:     Protected
+        """);
 
     Assert(
         enabledStatus.State == UwfState.Locked &&
         enabledStatus.FilterEnabled == true &&
         enabledStatus.DriveCProtected == true &&
-        filterOnlyEnabledStatus.State == UwfState.Locked &&
+        filterOnlyEnabledStatus.State == UwfState.Unknown &&
         filterOnlyEnabledStatus.FilterEnabled == true &&
-        disabledStatus.State == UwfState.Unlocked &&
+        disabledStatus.State == UwfState.Unknown &&
         disabledStatus.FilterEnabled == false &&
-        unprotectedVolumeStatus.State == UwfState.Locked &&
+        unprotectedVolumeStatus.State == UwfState.Unlocked &&
         unprotectedVolumeStatus.FilterEnabled == true &&
-        unprotectedVolumeStatus.DriveCProtected == false,
-        "UWF status parser did not derive On or Off from the current " +
-        "uwfmgr Filter state value.");
+        unprotectedVolumeStatus.DriveCProtected == false &&
+        nextSessionOnlyStatus.State == UwfState.Unknown &&
+        nextSessionOnlyStatus.DriveCProtected is null,
+        "UWF status parser did not derive On or Off from drive C in the " +
+        "Current Session volume settings.");
 }
 
 static void TestMainWindowStartup()

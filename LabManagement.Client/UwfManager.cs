@@ -32,12 +32,13 @@ public sealed class UwfManager : IUwfManager
         string output,
         string details = "")
     {
+        string currentSession = ExtractCurrentSession(output);
         bool? filterEnabled = FindBoolean(
-            output,
+            currentSession,
             "filter\\s+state");
-        bool? driveCProtected = FindDriveCProtection(output);
+        bool? driveCProtected = FindDriveCProtection(currentSession);
 
-        UwfState state = filterEnabled switch
+        UwfState state = driveCProtected switch
         {
             true => UwfState.Locked,
             false => UwfState.Unlocked,
@@ -153,21 +154,48 @@ public sealed class UwfManager : IUwfManager
     {
         Match match = Regex.Match(
             text,
-            "^\\s*volume[^\\r\\n]*\\[c:\\][^\\r\\n]*\\r?\\n" +
-            "\\s*volume\\s+state\\s*:\\s*" +
-            "(?<value>protected|unprotected)\\b",
-            RegexOptions.IgnoreCase | RegexOptions.Multiline);
+            "^[ \\t]*volume[^\\r\\n]*\\[[ \\t]*c:[ \\t]*\\]" +
+            "[^\\r\\n]*\\r?\\n[ \\t]*" +
+            "volume\\s+state\\s*:\\s*" +
+            "(?<value>protected|un-?protected)\\b",
+            RegexOptions.IgnoreCase |
+            RegexOptions.Multiline |
+            RegexOptions.CultureInvariant);
 
         return match.Success
             ? ParseBooleanValue(match.Groups["value"].Value)
             : null;
     }
 
+    private static string ExtractCurrentSession(string output)
+    {
+        const string currentHeader = "Current Session Settings";
+        const string nextHeader = "Next Session Settings";
+
+        int currentStart = output.IndexOf(
+            currentHeader,
+            StringComparison.OrdinalIgnoreCase);
+
+        if (currentStart < 0)
+            return string.Empty;
+
+        currentStart += currentHeader.Length;
+        int nextStart = output.IndexOf(
+            nextHeader,
+            currentStart,
+            StringComparison.OrdinalIgnoreCase);
+
+        return nextStart < 0
+            ? output[currentStart..]
+            : output[currentStart..nextStart];
+    }
+
     private static bool? ParseBooleanValue(string value) =>
         value.ToLowerInvariant() switch
         {
             "yes" or "on" or "true" or "enabled" or "protected" => true,
-            "no" or "off" or "false" or "disabled" or "unprotected" => false,
+            "no" or "off" or "false" or "disabled" or
+                "unprotected" or "un-protected" => false,
             _ => null
         };
 
