@@ -349,7 +349,7 @@ namespace LabManagement.Host
                     }
 
                     client.UwfState = status.State;
-                    client.LastResult = status.Details;
+                    client.LastResult = FormatUwfStatusResult(status.State);
                     return;
                 }
 
@@ -374,6 +374,14 @@ namespace LabManagement.Host
                     client.UwfState = UwfState.Unknown;
             }
         }
+
+        internal static string FormatUwfStatusResult(UwfState state) =>
+            state switch
+            {
+                UwfState.Locked => "On",
+                UwfState.Unlocked => "Off",
+                _ => "Unknown"
+            };
 
         private void Settings_Click(
             object sender,

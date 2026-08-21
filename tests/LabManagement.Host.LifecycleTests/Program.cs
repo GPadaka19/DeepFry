@@ -31,6 +31,7 @@ else
     TestSignInDialogHasOnePasswordField();
     TestPasswordSetupSubmission();
     TestHostPasswordManager();
+    TestUwfStatusResultFormatting();
     await TestCommandDispatcherAsync();
     await TestHostDiscoversClientAsync();
     await TestHeartbeatTimeoutAndDisconnectAsync();
@@ -233,6 +234,15 @@ static void TestMainWindowConstruction()
         throw new InvalidOperationException(
             "MainWindow construction failed.",
             failure);
+}
+
+static void TestUwfStatusResultFormatting()
+{
+    Assert(
+        MainWindow.FormatUwfStatusResult(UwfState.Locked) == "On" &&
+        MainWindow.FormatUwfStatusResult(UwfState.Unlocked) == "Off" &&
+        MainWindow.FormatUwfStatusResult(UwfState.Unknown) == "Unknown",
+        "UWF status result was not reduced to On, Off, or Unknown.");
 }
 
 static void TestMainWindowStartup()
