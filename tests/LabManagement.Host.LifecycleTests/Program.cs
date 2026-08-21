@@ -274,8 +274,17 @@ static void TestUwfStatusParserUsesUwfMgrLabels()
         """;
 
     UwfStatusPayload enabledStatus = UwfManager.ParseStatus(
-        capturedProtectedOutput,
-        string.Empty);
+        capturedProtectedOutput);
+    UwfStatusPayload filterOnlyEnabledStatus = UwfManager.ParseStatus(
+        """
+        Current Session Settings
+
+        FILTER SETTINGS
+            Filter state:     ON
+            Commit pending:   N/A
+            Shutdown pending: N/A
+            HORM mode:        N/A
+        """);
 
     const string disabledFilterOutput = """
         Current Session Settings
@@ -288,8 +297,11 @@ static void TestUwfStatusParserUsesUwfMgrLabels()
         FILTER SETTINGS
             Filter state:     ON
         """;
-    const string unprotectedVolumeOutput = """
+    const string enabledFilterUnprotectedVolumeOutput = """
         Current Session Settings
+
+        FILTER SETTINGS
+            Filter state:     ON
 
         VOLUME SETTINGS
         Volume 00000000-0000-0000-0000-000000000000 [C:]
@@ -301,28 +313,23 @@ static void TestUwfStatusParserUsesUwfMgrLabels()
         """;
 
     UwfStatusPayload disabledStatus = UwfManager.ParseStatus(
-        disabledFilterOutput,
-        unprotectedVolumeOutput);
-    UwfStatusPayload disabledFilterStatus = UwfManager.ParseStatus(
-        disabledFilterOutput,
-        capturedProtectedOutput);
+        disabledFilterOutput);
     UwfStatusPayload unprotectedVolumeStatus = UwfManager.ParseStatus(
-        capturedProtectedOutput,
-        unprotectedVolumeOutput);
+        enabledFilterUnprotectedVolumeOutput);
 
     Assert(
         enabledStatus.State == UwfState.Locked &&
         enabledStatus.FilterEnabled == true &&
         enabledStatus.DriveCProtected == true &&
+        filterOnlyEnabledStatus.State == UwfState.Locked &&
+        filterOnlyEnabledStatus.FilterEnabled == true &&
         disabledStatus.State == UwfState.Unlocked &&
         disabledStatus.FilterEnabled == false &&
-        disabledStatus.DriveCProtected == false &&
-        disabledFilterStatus.State == UwfState.Unlocked &&
-        unprotectedVolumeStatus.State == UwfState.Unlocked &&
+        unprotectedVolumeStatus.State == UwfState.Locked &&
         unprotectedVolumeStatus.FilterEnabled == true &&
         unprotectedVolumeStatus.DriveCProtected == false,
-        "UWF status parser did not understand uwfmgr Filter state and " +
-        "Volume state output.");
+        "UWF status parser did not derive On or Off from the current " +
+        "uwfmgr Filter state value.");
 }
 
 static void TestMainWindowStartup()

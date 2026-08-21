@@ -11,46 +11,36 @@ public sealed class UwfManager : IUwfManager
     public async Task<UwfStatusPayload> GetStatusAsync(
         CancellationToken cancellationToken)
     {
-        UwfCommandResult filter = await RunAsync(
+        UwfCommandResult configuration = await RunAsync(
             ["get-config"],
             cancellationToken);
-        UwfCommandResult volume = await RunAsync(
-            ["volume", "get-config", DriveC],
-            cancellationToken);
 
-        string details = JoinOutput(filter, volume);
+        string details = JoinOutput(configuration);
 
-        if (filter.ExitCode != 0 || volume.ExitCode != 0)
+        if (configuration.ExitCode != 0)
         {
             throw new InvalidOperationException(
                 $"uwfmgr get-config failed. {details}");
         }
 
         return ParseStatus(
-            filter.StandardOutput,
-            volume.StandardOutput,
+            configuration.StandardOutput,
             details);
     }
 
     internal static UwfStatusPayload ParseStatus(
-        string filterOutput,
-        string volumeOutput,
+        string output,
         string details = "")
     {
         bool? filterEnabled = FindBoolean(
-            filterOutput,
-            "filter\\s+(?:enabled|state)");
-        bool? driveCProtected =
-            FindDriveCProtection(volumeOutput) ??
-            FindDriveCProtection(filterOutput) ??
-            FindBoolean(
-                volumeOutput,
-                "(?:volume\\s+state|(?:volume\\s+)?protected)");
+            output,
+            "filter\\s+state");
+        bool? driveCProtected = FindDriveCProtection(output);
 
-        UwfState state = (filterEnabled, driveCProtected) switch
+        UwfState state = filterEnabled switch
         {
-            (true, true) => UwfState.Locked,
-            (false, _) or (_, false) => UwfState.Unlocked,
+            true => UwfState.Locked,
+            false => UwfState.Unlocked,
             _ => UwfState.Unknown
         };
 
