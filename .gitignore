@@ -2,8 +2,8 @@
 [Bb]in/
 [Oo]bj/
 artifacts/
-.verify/
-.verify-obj/
+publish/
+.verify*/
 
 # Visual Studio and user-specific files
 .vs/
