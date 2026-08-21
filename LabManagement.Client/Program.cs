@@ -1,5 +1,7 @@
 using LabManagement.Client;
 
+ClientConsoleBranding.Print();
+
 var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddWindowsService(options =>
 {

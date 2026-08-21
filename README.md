@@ -97,6 +97,29 @@ REGISTER/HEARTBEAT, dan mengirim command dengan response yang sesuai request ID.
 
 Tidak diperlukan `.env`, pairing key, atau argumen command-line.
 
+## Simulasi UWF di Windows Home
+
+Untuk menguji alur Client → Host tanpa Windows Enterprise atau UWF, jalankan
+Client secara langsung (bukan sebagai Windows Service) dalam mode simulasi.
+Mode ini hanya aktif pada environment `Development`; pada environment produksi
+Client tetap menjalankan `uwfmgr.exe`.
+
+1. Build atau extract paket Client.
+2. Buka PowerShell sebagai Administrator pada folder Client.
+3. Jalankan fixture `Un-protected`:
+
+```powershell
+.\SimulationFixtures\Start-UwfSimulation.ps1 -State Unprotected
+```
+
+   Gunakan `-State Protected` untuk menguji kondisi sebaliknya.
+4. Jalankan Host pada PC yang sama, tunggu Client terdeteksi di `127.0.0.1`,
+   lalu klik **Refresh UWF Status**.
+
+Client akan mengembalikan isi fixture seperti output `uwfmgr.exe get-config`.
+Tombol Lock/Unlock sengaja ditolak saat simulasi aktif. Tekan `Ctrl+C` pada
+jendela Client untuk menghentikan simulasi.
+
 ## Publish Release
 
 Target: Windows x64, self-contained, single-file, trimming/AOT/ReadyToRun OFF.
@@ -213,6 +236,17 @@ Current Session pada output `uwfmgr.exe get-config`: `Protected` ditampilkan
 sebagai `Protected`, sedangkan `Un-protected` atau `Unprotected` ditampilkan
 sebagai `Un-protected`. Konfigurasi Next Session dan volume selain C tidak
 menentukan status kolom ini.
+
+Saat status menjadi `Unknown`, ambil kedua log berikut setelah klik **Refresh
+UWF Status**:
+
+- Host: `C:\ProgramData\LabManagement\logs\host.log`
+- Client: `C:\ProgramData\LabManagement\logs\client.log`
+
+Keduanya mencatat hostname, state hasil parser, `FilterEnabled`,
+`DriveCProtected`, serta output mentah stdout/stderr dari `uwfmgr.exe`. File
+disimpan sampai 5 MB dan satu salinan sebelumnya tersedia dengan akhiran
+`.previous`.
 
 Perintah Lock/Unlock hanya mengubah konfigurasi UWF dan tidak pernah melakukan
 restart otomatis. Untuk menerapkan perubahan, pilih PC target, klik

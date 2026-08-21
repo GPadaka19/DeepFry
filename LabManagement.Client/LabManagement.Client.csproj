@@ -13,4 +13,11 @@
     <ProjectReference Include="../LabManagement.Protocol/LabManagement.Protocol.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="SimulationFixtures\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>

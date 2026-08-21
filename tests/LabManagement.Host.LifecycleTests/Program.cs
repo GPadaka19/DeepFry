@@ -7,6 +7,10 @@ using System.Windows.Controls;
 using LabManagement.Client;
 using LabManagement.Host;
 using LabManagement.Protocol;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
 
 if (args.Contains("--ui-smoke", StringComparer.Ordinal))
 {
@@ -31,9 +35,13 @@ else
     TestSignInDialogHasOnePasswordField();
     TestPasswordSetupSubmission();
     TestHostPasswordManager();
+    TestHostDiagnosticLog();
+    TestClientDiagnosticLog();
     TestUwfStatusResultFormatting();
     TestUwfStatusColumnFormatting();
     TestUwfStatusParserUsesCurrentDriveCVolumeState();
+    TestUwfStatusParserHandlesConsoleControlCharacters();
+    await TestUwfSimulationFixtureAsync();
     await TestCommandDispatcherAsync();
     await TestHostDiscoversClientAsync();
     await TestHeartbeatTimeoutAndDisconnectAsync();
@@ -247,6 +255,60 @@ static void TestUwfStatusResultFormatting()
         "UWF status result was not reduced to On, Off, or Unknown.");
 }
 
+static void TestHostDiagnosticLog()
+{
+    string directory = Path.Combine(
+        Path.GetTempPath(),
+        $"LabManagement-log-test-{Guid.NewGuid():N}");
+
+    try
+    {
+        var log = new HostDiagnosticLog(directory);
+        log.Write(
+            "UWF status response",
+            "State=Unknown\nRaw output=Volume state: Un-protected");
+
+        string contents = File.ReadAllText(log.LogPath);
+
+        Assert(
+            contents.Contains("UWF status response", StringComparison.Ordinal) &&
+            contents.Contains("Volume state: Un-protected", StringComparison.Ordinal),
+            "Host diagnostic log did not preserve the UWF response details.");
+    }
+    finally
+    {
+        if (Directory.Exists(directory))
+            Directory.Delete(directory, recursive: true);
+    }
+}
+
+static void TestClientDiagnosticLog()
+{
+    string directory = Path.Combine(
+        Path.GetTempPath(),
+        $"LabManagement-log-test-{Guid.NewGuid():N}");
+
+    try
+    {
+        var log = new ClientDiagnosticLog(directory);
+        log.Write(
+            "UWF status result",
+            "State=Unknown\nStandardOutput=Volume state: Un-protected");
+
+        string contents = File.ReadAllText(log.LogPath);
+
+        Assert(
+            contents.Contains("UWF status result", StringComparison.Ordinal) &&
+            contents.Contains("Volume state: Un-protected", StringComparison.Ordinal),
+            "Client diagnostic log did not preserve the UWF command output.");
+    }
+    finally
+    {
+        if (Directory.Exists(directory))
+            Directory.Delete(directory, recursive: true);
+    }
+}
+
 static void TestUwfStatusColumnFormatting()
 {
     var client = new ClientInfo();
@@ -376,6 +438,101 @@ static void TestUwfStatusParserUsesCurrentDriveCVolumeState()
         nextSessionOnlyStatus.DriveCProtected is null,
         "UWF status parser did not derive On or Off from drive C in the " +
         "Current Session volume settings.");
+}
+
+static void TestUwfStatusParserHandlesConsoleControlCharacters()
+{
+    const string normalOutput = """
+        Current Session Settings
+
+        FILTER SETTINGS
+            Filter state:     ON
+
+        VOLUME SETTINGS
+        Volume 38c97866-e219-45c5-a3fc-6e2630a87435 [C:]
+            Volume state:     Un-protected
+
+        Next Session Settings
+
+        VOLUME SETTINGS
+        Volume 38c97866-e219-45c5-a3fc-6e2630a87435 [C:]
+            Volume state:     Protected
+        """;
+
+    var consoleOutput = new StringBuilder();
+    foreach (char character in normalOutput)
+    {
+        consoleOutput.Append(character);
+        consoleOutput.Append('\0');
+    }
+
+    UwfStatusPayload status = UwfManager.ParseStatus(
+        consoleOutput.ToString());
+
+    Assert(
+        status.State == UwfState.Unlocked &&
+        status.DriveCProtected == false,
+        "UWF status parser did not tolerate console control characters " +
+        "in the current Volume state output.");
+}
+
+static async Task TestUwfSimulationFixtureAsync()
+{
+    string fixturePath = Path.GetTempFileName();
+
+    try
+    {
+        await File.WriteAllTextAsync(
+            fixturePath,
+            """
+            Current Session Settings
+
+            VOLUME SETTINGS
+            Volume 38c97866-e219-45c5-a3fc-6e2630a87435 [C:]
+                Volume state:     Un-protected
+
+            Next Session Settings
+
+            VOLUME SETTINGS
+            Volume 38c97866-e219-45c5-a3fc-6e2630a87435 [C:]
+                Volume state:     Protected
+            """);
+
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Uwf:SimulationFixturePath"] = fixturePath
+            })
+            .Build();
+        var manager = new UwfManager(
+            new TestHostEnvironment(Environments.Development),
+            configuration,
+            NullLogger<UwfManager>.Instance);
+
+        UwfStatusPayload status = await manager.GetStatusAsync(
+            CancellationToken.None);
+
+        Assert(
+            status.State == UwfState.Unlocked &&
+            status.DriveCProtected == false &&
+            status.Details.Contains("Simulated", StringComparison.Ordinal),
+            "UWF simulation did not return the Current Session volume state.");
+
+        await AssertThrowsAsync<InvalidOperationException>(
+            manager.LockDriveCAsync(CancellationToken.None));
+
+        var productionManager = new UwfManager(
+            new TestHostEnvironment(Environments.Production),
+            configuration,
+            NullLogger<UwfManager>.Instance);
+
+        await AssertThrowsAsync<InvalidOperationException>(
+            productionManager.GetStatusAsync(CancellationToken.None));
+    }
+    finally
+    {
+        File.Delete(fixturePath);
+    }
 }
 
 static void TestMainWindowStartup()
@@ -1021,6 +1178,18 @@ file sealed record ConnectedClient(
     TcpClient TcpClient,
     NetworkStream Stream,
     ClientConnection Connection);
+
+file sealed class TestHostEnvironment(string environmentName) : IHostEnvironment
+{
+    public string EnvironmentName { get; set; } = environmentName;
+
+    public string ApplicationName { get; set; } = "LifecycleTests";
+
+    public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+
+    public IFileProvider ContentRootFileProvider { get; set; } =
+        new NullFileProvider();
+}
 
 file sealed class FakeUwfManager : IUwfManager
 {

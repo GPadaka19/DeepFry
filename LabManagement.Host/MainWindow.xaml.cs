@@ -8,6 +8,7 @@ namespace LabManagement.Host
     {
         private readonly HostPasswordManager? _passwordManager;
         private HostConfiguration _configuration = HostConfiguration.Default;
+        private static readonly HostDiagnosticLog DiagnosticLog = new();
 
         private readonly ClientRegistry _clients = new();
 
@@ -353,6 +354,14 @@ namespace LabManagement.Host
 
             try
             {
+                if (commandName == "uwf.status")
+                {
+                    DiagnosticLog.Write(
+                        "UWF status request",
+                        $"Hostname={client.Hostname}{Environment.NewLine}" +
+                        $"IpAddress={client.IpAddress}");
+                }
+
                 ResponseMessage response = await connection.SendCommandAsync(
                     commandName,
                     TimeSpan.FromSeconds(10),
@@ -360,6 +369,15 @@ namespace LabManagement.Host
 
                 if (!response.Success)
                 {
+                    if (commandName == "uwf.status")
+                    {
+                        DiagnosticLog.Write(
+                            "UWF status error response",
+                            $"Hostname={client.Hostname}{Environment.NewLine}" +
+                            $"ErrorCode={response.Error?.Code}{Environment.NewLine}" +
+                            $"ErrorMessage={response.Error?.Message}");
+                    }
+
                     client.LastResult = response.Error?.Message ??
                         "Command failed.";
 
@@ -376,6 +394,10 @@ namespace LabManagement.Host
 
                     if (status is null)
                     {
+                        DiagnosticLog.Write(
+                            "Invalid UWF status response",
+                            $"Hostname={client.Hostname}{Environment.NewLine}" +
+                            $"Payload={response.Payload.GetRawText()}");
                         client.UwfState = UwfState.Unknown;
                         client.LastResult = "Invalid UWF status response.";
                         return;
@@ -383,6 +405,14 @@ namespace LabManagement.Host
 
                     client.UwfState = status.State;
                     client.LastResult = FormatUwfStatusResult(status.State);
+                    DiagnosticLog.Write(
+                        "UWF status response",
+                        $"Hostname={client.Hostname}{Environment.NewLine}" +
+                        $"IpAddress={client.IpAddress}{Environment.NewLine}" +
+                        $"State={status.State}{Environment.NewLine}" +
+                        $"FilterEnabled={status.FilterEnabled}{Environment.NewLine}" +
+                        $"DriveCProtected={status.DriveCProtected}{Environment.NewLine}" +
+                        $"Details:{Environment.NewLine}{status.Details}");
                     return;
                 }
 
@@ -396,6 +426,14 @@ namespace LabManagement.Host
             }
             catch (TimeoutException)
             {
+                if (commandName == "uwf.status")
+                {
+                    DiagnosticLog.Write(
+                        "UWF status timeout",
+                        $"Hostname={client.Hostname}{Environment.NewLine}" +
+                        $"IpAddress={client.IpAddress}");
+                }
+
                 client.LastResult = "Command timed out.";
 
                 if (commandName == "uwf.status")
@@ -403,6 +441,15 @@ namespace LabManagement.Host
             }
             catch (Exception ex)
             {
+                if (commandName == "uwf.status")
+                {
+                    DiagnosticLog.Write(
+                        "UWF status exception",
+                        $"Hostname={client.Hostname}{Environment.NewLine}" +
+                        $"IpAddress={client.IpAddress}{Environment.NewLine}" +
+                        $"{ex.GetType().Name}: {ex.Message}");
+                }
+
                 client.LastResult = ex.Message;
 
                 if (commandName == "uwf.status")

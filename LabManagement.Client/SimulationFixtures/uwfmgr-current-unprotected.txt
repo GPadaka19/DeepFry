@@ -1,0 +1,21 @@
+Unified Write Filter Configuration Utility version 10.0.26200
+Copyright (C) Microsoft Corporation. All rights reserved.
+
+Current Session Settings
+
+FILTER SETTINGS
+    Filter state:     ON
+
+VOLUME SETTINGS
+Volume 38c97866-e219-45c5-a3fc-6e2630a87435 [C:]
+    Volume state:     Un-protected
+    Volume ID:        38c97866-e219-45c5-a3fc-6e2630a87435
+
+Next Session Settings
+
+FILTER SETTINGS
+    Filter state:     ON
+
+VOLUME SETTINGS
+Volume 38c97866-e219-45c5-a3fc-6e2630a87435 [C:]
+    Volume state:     Protected

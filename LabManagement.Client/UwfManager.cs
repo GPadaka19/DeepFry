@@ -1,38 +1,105 @@
 using System.Diagnostics;
+using System.Text;
 using System.Text.RegularExpressions;
 using LabManagement.Protocol;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace LabManagement.Client;
 
 public sealed class UwfManager : IUwfManager
 {
     private const string DriveC = "C:";
+    private readonly IHostEnvironment _environment;
+    private readonly IConfiguration _configuration;
+    private readonly ILogger<UwfManager> _logger;
+    private readonly ClientDiagnosticLog _diagnosticLog = new();
+
+    public UwfManager(
+        IHostEnvironment environment,
+        IConfiguration configuration,
+        ILogger<UwfManager> logger)
+    {
+        _environment = environment;
+        _configuration = configuration;
+        _logger = logger;
+    }
 
     public async Task<UwfStatusPayload> GetStatusAsync(
         CancellationToken cancellationToken)
     {
-        UwfCommandResult configuration = await RunAsync(
-            ["get-config"],
-            cancellationToken);
+        string? simulationFixturePath = GetSimulationFixturePath();
+
+        if (simulationFixturePath is not null)
+        {
+            if (!File.Exists(simulationFixturePath))
+            {
+                throw new InvalidOperationException(
+                    $"UWF simulation fixture was not found: " +
+                    simulationFixturePath);
+            }
+
+            string simulatedOutput = await File.ReadAllTextAsync(
+                simulationFixturePath,
+                cancellationToken);
+
+            UwfStatusPayload simulatedStatus = ParseStatus(
+                simulatedOutput,
+                $"Simulated UWF configuration from {simulationFixturePath}");
+            LogStatusResult(
+                "simulation fixture",
+                0,
+                simulatedOutput,
+                string.Empty,
+                simulatedStatus);
+            return simulatedStatus;
+        }
+
+        UwfCommandResult configuration;
+
+        try
+        {
+            configuration = await RunAsync(
+                ["get-config"],
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            LogStatusFailure("uwfmgr.exe could not be started", ex);
+            throw;
+        }
 
         string details = JoinOutput(configuration);
 
         if (configuration.ExitCode != 0)
         {
+            LogStatusResult(
+                "uwfmgr.exe get-config",
+                configuration.ExitCode,
+                configuration.StandardOutput,
+                configuration.StandardError,
+                null);
             throw new InvalidOperationException(
                 $"uwfmgr get-config failed. {details}");
         }
 
-        return ParseStatus(
+        UwfStatusPayload status = ParseStatus(details, details);
+        LogStatusResult(
+            "uwfmgr.exe get-config",
+            configuration.ExitCode,
             configuration.StandardOutput,
-            details);
+            configuration.StandardError,
+            status);
+        return status;
     }
 
     internal static UwfStatusPayload ParseStatus(
         string output,
         string details = "")
     {
-        string currentSession = ExtractCurrentSession(output);
+        string normalizedOutput = NormalizeConsoleOutput(output);
+        string currentSession = ExtractCurrentSession(normalizedOutput);
         bool? filterEnabled = FindBoolean(
             currentSession,
             "filter\\s+state");
@@ -57,6 +124,8 @@ public sealed class UwfManager : IUwfManager
     public async Task<CommandResultPayload> LockDriveCAsync(
         CancellationToken cancellationToken)
     {
+        EnsureUwfControlIsAvailable();
+
         UwfCommandResult protect = await RunAsync(
             ["volume", "protect", DriveC],
             cancellationToken);
@@ -82,6 +151,8 @@ public sealed class UwfManager : IUwfManager
     public async Task<CommandResultPayload> UnlockDriveCAsync(
         CancellationToken cancellationToken)
     {
+        EnsureUwfControlIsAvailable();
+
         UwfCommandResult unprotect = await RunAsync(
             ["volume", "unprotect", DriveC],
             cancellationToken);
@@ -188,6 +259,91 @@ public sealed class UwfManager : IUwfManager
         return nextStart < 0
             ? output[currentStart..]
             : output[currentStart..nextStart];
+    }
+
+    private static string NormalizeConsoleOutput(string output)
+    {
+        if (string.IsNullOrEmpty(output))
+            return string.Empty;
+
+        var normalized = new StringBuilder(output.Length);
+
+        foreach (char character in output)
+        {
+            if (character == '\0')
+                continue;
+
+            if (char.IsControl(character) &&
+                character is not '\r' and not '\n' and not '\t')
+            {
+                continue;
+            }
+
+            normalized.Append(character);
+        }
+
+        return normalized.ToString();
+    }
+
+    private string? GetSimulationFixturePath()
+    {
+        string? configuredPath =
+            _configuration["Uwf:SimulationFixturePath"];
+
+        if (string.IsNullOrWhiteSpace(configuredPath))
+            return null;
+
+        if (!_environment.IsDevelopment())
+        {
+            throw new InvalidOperationException(
+                "UWF simulation is only available in the Development " +
+                "environment.");
+        }
+
+        return Path.IsPathRooted(configuredPath)
+            ? configuredPath
+            : Path.Combine(_environment.ContentRootPath, configuredPath);
+    }
+
+    private void EnsureUwfControlIsAvailable()
+    {
+        if (GetSimulationFixturePath() is not null)
+        {
+            throw new InvalidOperationException(
+                "UWF lock and unlock are disabled while simulation is active.");
+        }
+    }
+
+    private void LogStatusResult(
+        string source,
+        int exitCode,
+        string standardOutput,
+        string standardError,
+        UwfStatusPayload? status)
+    {
+        string parsedStatus = status is null
+            ? "No status payload was produced."
+            : $"State={status.State}; FilterEnabled={status.FilterEnabled}; " +
+              $"DriveCProtected={status.DriveCProtected}";
+        string details = $"Source={source}{Environment.NewLine}" +
+            $"ExitCode={exitCode}{Environment.NewLine}" +
+            $"{parsedStatus}{Environment.NewLine}" +
+            $"StandardOutput:{Environment.NewLine}{standardOutput}{Environment.NewLine}" +
+            $"StandardError:{Environment.NewLine}{standardError}";
+
+        _diagnosticLog.Write("UWF status result", details);
+
+        if (status?.State == UwfState.Unknown || status is null)
+            _logger.LogWarning("UWF status was not resolved. {details}", details);
+        else
+            _logger.LogInformation("UWF status resolved. {details}", details);
+    }
+
+    private void LogStatusFailure(string title, Exception exception)
+    {
+        string details = $"{exception.GetType().Name}: {exception.Message}";
+        _diagnosticLog.Write(title, details);
+        _logger.LogError(exception, "{title}", title);
     }
 
     private static bool? ParseBooleanValue(string value) =>

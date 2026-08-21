@@ -86,7 +86,7 @@
                 <DataGridTextColumn Header="Computer" Binding="{Binding Hostname}" IsReadOnly="True" MinWidth="150" Width="1.3*"/>
                 <DataGridTextColumn Header="IP Address" Binding="{Binding IpAddress}" IsReadOnly="True" MinWidth="130" Width="1.1*"/>
                 <DataGridTextColumn Header="Connection" Binding="{Binding Status}" IsReadOnly="True" MinWidth="100" Width="0.9*"/>
-                <DataGridTextColumn Header="UWF" Binding="{Binding UwfStatusText}" IsReadOnly="True" MinWidth="110" Width="0.8*"/>
+                <DataGridTextColumn Header="Disk C:\ Status" Binding="{Binding UwfStatusText}" IsReadOnly="True" MinWidth="110" Width="0.8*"/>
                 <DataGridTemplateColumn Header="Last Result" IsReadOnly="True" MinWidth="240" Width="2.5*">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
