@@ -26,13 +26,13 @@ else if (args.Contains("--ui-layout", StringComparer.Ordinal))
 else
 {
     TestProtocolContract();
-    TestSharedSecretAuthentication();
-    TestHostIpResolution();
+    TestLabNetworkDiscovery();
     TestAppKeepsRunningAfterLoginDialogCloses();
     TestSignInDialogHasOnePasswordField();
     TestPasswordSetupSubmission();
     TestHostPasswordManager();
     await TestCommandDispatcherAsync();
+    await TestHostDiscoversClientAsync();
     await TestHeartbeatTimeoutAndDisconnectAsync();
     await TestDuplicateHostnameReconnectAsync();
     await TestMalformedRegistrationAsync();
@@ -42,45 +42,21 @@ else
     await TestRequestTimeoutAndDisconnectAsync();
 
     Console.WriteLine(
-        "PASS: lifecycle, reconnect, malformed message, EOF, and framing checks.");
+        "PASS: discovery, lifecycle, reconnect, command, EOF, and framing checks.");
 }
 
-static void TestHostIpResolution()
+static void TestLabNetworkDiscovery()
 {
-    Assert(
-        HostIpResolver.Resolve("10.22.1.13") == "10.22.1.90" &&
-        HostIpResolver.Resolve("10.22.1.13", "127.0.0.1") == "127.0.0.1",
-        "Client Host IP resolution did not use the lab .90 convention or development override.");
-}
-
-static void TestSharedSecretAuthentication()
-{
-    string sharedSecret = Convert.ToBase64String(
-        System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
-    string challenge = SharedSecretAuthenticator.CreateChallenge();
-    string proof = SharedSecretAuthenticator.CreateProof(
-        sharedSecret,
-        challenge,
-        "LAB-CLIENT-01");
+    IReadOnlyList<string> addresses =
+        LabNetworkDiscovery.BuildClientAddresses("10.22.4.90");
 
     Assert(
-        SharedSecretAuthenticator.VerifyProof(
-            sharedSecret,
-            challenge,
-            "LAB-CLIENT-01",
-            proof) &&
-        !SharedSecretAuthenticator.VerifyProof(
-            sharedSecret,
-            challenge,
-            "LAB-CLIENT-02",
-            proof) &&
-        !SharedSecretAuthenticator.VerifyProof(
-            Convert.ToBase64String(
-                System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)),
-            challenge,
-            "LAB-CLIENT-01",
-            proof),
-        "Shared secret proof did not reject a different hostname or key.");
+        addresses.Count == 89 &&
+        addresses[0] == "10.22.4.1" &&
+        addresses[^1] == "10.22.4.89" &&
+        !addresses.Contains("10.22.4.90") &&
+        LabNetworkDiscovery.BuildClientAddresses("10.22.4.13").Count == 0,
+        "Host scan range did not follow the 10.x.x.90 lab convention.");
 }
 
 static void TestAppKeepsRunningAfterLoginDialogCloses()
@@ -183,32 +159,40 @@ static void TestHostPasswordManager()
             !manager.VerifyPassword("wrong-password"),
             "Host password verification is incorrect.");
 
-        string settingsJson = File.ReadAllText(
-            Path.Combine(directory, "host-settings.json"));
+        string settingsPath = Path.Combine(directory, "host-settings.json");
+        string settingsJson = File.ReadAllText(settingsPath);
         Assert(
             !settingsJson.Contains("L4B244", StringComparison.Ordinal) &&
             settingsJson.Contains("PasswordHash", StringComparison.Ordinal) &&
             settingsJson.Contains("PasswordSalt", StringComparison.Ordinal),
             "Host settings persisted the password instead of only its hash data.");
 
+        int objectStart = settingsJson.IndexOf('{');
+        File.WriteAllText(
+            settingsPath,
+            settingsJson.Insert(
+                objectStart + 1,
+                "\n  \"ClientSharedSecret\": \"legacy-key\",\n  \"TcpPort\": 6000,"));
+        manager.GetConfiguration();
+        string migratedSettingsJson = File.ReadAllText(settingsPath);
+        Assert(
+            !migratedSettingsJson.Contains(
+                "ClientSharedSecret",
+                StringComparison.OrdinalIgnoreCase) &&
+            !migratedSettingsJson.Contains(
+                "TcpPort",
+                StringComparison.OrdinalIgnoreCase),
+            "Legacy pairing key or TCP port survived Host settings migration.");
+
+        manager.SaveConfiguration(new HostConfiguration("Lab 244"));
+
         Assert(
             !manager.ChangePassword("wrong-password", "LAB999") &&
             manager.ChangePassword("L4B244", "LAB999") &&
             !manager.VerifyPassword("L4B244") &&
-            manager.VerifyPassword("LAB999"),
-            "Host password change did not require the current password.");
-
-        string oldClientKey = manager.GetClientSharedSecret();
-        string newClientKey = manager.RotateClientSharedSecret();
-        Assert(
-            oldClientKey != newClientKey &&
-            manager.GetClientSharedSecret() == newClientKey,
-            "Client Pairing Key rotation did not persist a new key.");
-
-        manager.SaveConfiguration(new HostConfiguration("Lab 244", 5020));
-        Assert(
-            manager.GetConfiguration() == new HostConfiguration("Lab 244", 5020),
-            "Host lab configuration did not persist.");
+            manager.VerifyPassword("LAB999") &&
+            manager.GetConfiguration() == new HostConfiguration("Lab 244"),
+            "Host password change failed or reset the saved lab configuration.");
     }
     finally
     {
@@ -413,6 +397,62 @@ static async Task TestCommandDispatcherAsync()
         !rejectedResponse.Success &&
         rejectedResponse.Error?.Code == "COMMAND_NOT_ALLOWED",
         "Command allowlist did not reject an unknown command.");
+}
+
+static async Task TestHostDiscoversClientAsync()
+{
+    using var listener = new TcpListener(IPAddress.Loopback, 0);
+    listener.Start();
+    int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+    using var sessionCancellation = new CancellationTokenSource(
+        TimeSpan.FromSeconds(5));
+
+    Task clientSessionTask = Task.Run(async () =>
+    {
+        TcpClient host = await listener.AcceptTcpClientAsync(
+            sessionCancellation.Token);
+        await ClientSession.RunAsync(
+            host,
+            new ClientCommandDispatcher(new FakeUwfManager()),
+            sessionCancellation.Token);
+    });
+
+    var server = new HostServer(port);
+    IReadOnlyList<ClientConnection> connections =
+        await server.DiscoverClientsAsync(
+            [IPAddress.Loopback.ToString()],
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            sessionCancellation.Token);
+
+    Assert(
+        connections.Count == 1 &&
+        connections[0].Hostname == Environment.MachineName &&
+        connections[0].IpAddress == IPAddress.Loopback.ToString(),
+        "Host did not discover the listening Client on the target IP.");
+
+    ClientConnection connection = connections[0];
+    Task listenTask = connection.ListenAsync(sessionCancellation.Token);
+    ResponseMessage response = await connection.SendCommandAsync(
+        "uwf.status",
+        TimeSpan.FromSeconds(2),
+        sessionCancellation.Token);
+
+    Assert(
+        response.Success &&
+        response.GetPayload<UwfStatusPayload>()?.State == UwfState.Locked,
+        "Discovered Client did not process a Host command.");
+
+    sessionCancellation.Cancel();
+    connection.Dispose();
+
+    try
+    {
+        await Task.WhenAll(clientSessionTask, listenTask);
+    }
+    catch (Exception ex) when (
+        ex is OperationCanceledException or IOException or ObjectDisposedException)
+    {
+    }
 }
 
 static async Task TestHeartbeatTimeoutAndDisconnectAsync()

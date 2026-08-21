@@ -34,22 +34,19 @@ namespace LabManagement.Host
 
             _configuration = _passwordManager?.GetConfiguration() ??
                 HostConfiguration.Default;
-            _server = new HostServer(
-                _configuration.TcpPort,
-                _passwordManager?.GetClientSharedSecret());
-            _server.Start();
+            _server = new HostServer();
 
             StatusText.Text =
-                $"{_configuration.LabName} | TCP port {_configuration.TcpPort}";
+                $"{_configuration.LabName} | Scanning TCP 5020";
 
-            _ = AcceptClientsAsync(
+            _ = DiscoverClientsAsync(
                 _cancellationTokenSource.Token);
 
             _ = MonitorClientsAsync(
                 _cancellationTokenSource.Token);
         }
 
-        private async Task AcceptClientsAsync(
+        private async Task DiscoverClientsAsync(
             CancellationToken cancellationToken)
         {
             if (_server is null)
@@ -59,18 +56,25 @@ namespace LabManagement.Host
             {
                 try
                 {
-                    ClientConnection? connection =
-                        await _server.AcceptClientAsync(
+                    IReadOnlySet<string> connectedAddresses =
+                        await Dispatcher.InvokeAsync(
+                            _clients.GetConnectedIpAddresses);
+                    IReadOnlyList<ClientConnection> connections =
+                        await _server.DiscoverClientsAsync(
+                            LabNetworkDiscovery.GetCandidateClientAddresses(),
+                            connectedAddresses,
                             cancellationToken);
 
-                    if (connection is null)
-                        continue;
-
-                    AddOrUpdateClient(connection);
-
-                    _ = MonitorClientConnectionAsync(
-                        connection,
-                        cancellationToken);
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        foreach (ClientConnection connection in connections)
+                        {
+                            AddOrUpdateClient(connection);
+                            _ = MonitorClientConnectionAsync(
+                                connection,
+                                cancellationToken);
+                        }
+                    });
                 }
                 catch (OperationCanceledException)
                 {
@@ -81,8 +85,19 @@ namespace LabManagement.Host
                     await Dispatcher.InvokeAsync(() =>
                     {
                         StatusText.Text =
-                            $"Connection error: {ex.Message}";
+                            $"Discovery error: {ex.Message}";
                     });
+                }
+
+                try
+                {
+                    await Task.Delay(
+                        TimeSpan.FromSeconds(3),
+                        cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
                 }
             }
         }
@@ -123,9 +138,16 @@ namespace LabManagement.Host
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                await Task.Delay(
-                    TimeSpan.FromSeconds(1),
-                    cancellationToken);
+                try
+                {
+                    await Task.Delay(
+                        TimeSpan.FromSeconds(1),
+                        cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
 
                 await Dispatcher.InvokeAsync(() =>
                 {
@@ -205,6 +227,7 @@ namespace LabManagement.Host
         private void UpdateStatusText()
         {
             StatusText.Text =
+                $"{_configuration.LabName} | TCP 5020 | " +
                 $"Connected: {_clients.OnlineCount} / {_clients.Clients.Count}";
         }
 
@@ -391,49 +414,11 @@ namespace LabManagement.Host
                 return;
 
             manager.SaveConfiguration(dialog.Configuration);
-            MessageBox.Show(
-                "Konfigurasi tersimpan. Jalankan ulang Host bila TCP port diubah.",
-                "Deep Fry", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-
-        private void ClientPairingKey_Click(
-            object sender,
-            RoutedEventArgs e)
-        {
-            string key = App.PasswordManager.GetClientSharedSecret();
-            new PairingKeyDialog(key) { Owner = this }.ShowDialog();
-        }
-
-        private void ResetClientPairingKey_Click(
-            object sender,
-            RoutedEventArgs e)
-        {
-            MessageBoxResult confirmation = MessageBox.Show(
-                "Reset Client Pairing Key? Semua Client yang sedang Online akan " +
-                "diputus dan harus diperbarui dengan key baru sebelum dapat konek lagi.",
-                "Reset Client Pairing Key",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
-
-            if (confirmation != MessageBoxResult.Yes)
-                return;
-
-            string newKey = App.PasswordManager.RotateClientSharedSecret();
-            _server?.SetSharedSecret(newKey);
-
-            foreach (ClientConnection connection in _clients.DisconnectAll())
-            {
-                connection.HeartbeatReceived -= Connection_HeartbeatReceived;
-                connection.Dispose();
-            }
-
-            ClientGrid.Items.Refresh();
+            _configuration = dialog.Configuration;
             UpdateStatusText();
-
-            new PairingKeyDialog(newKey, wasRotated: true)
-            {
-                Owner = this
-            }.ShowDialog();
+            MessageBox.Show(
+                "Nama lab berhasil disimpan.",
+                "Deep Fry", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private void SelectAllCheckBox_Checked(
@@ -469,7 +454,6 @@ namespace LabManagement.Host
             EventArgs e)
         {
             _cancellationTokenSource?.Cancel();
-            _server?.Stop();
         }
     }
 }

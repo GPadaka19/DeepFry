@@ -37,6 +37,7 @@ public sealed class HostPasswordManager
     public void SetPassword(string password)
     {
         ValidateNewPassword(password);
+        HostSettings? existingSettings = ReadSettings();
         byte[] salt = RandomNumberGenerator.GetBytes(SaltLength);
         byte[] hash = HashPassword(password, salt, Iterations);
         var settings = new HostSettings
@@ -44,50 +45,38 @@ public sealed class HostPasswordManager
             PasswordHash = Convert.ToBase64String(hash),
             PasswordSalt = Convert.ToBase64String(salt),
             PasswordIterations = Iterations,
-            ClientSharedSecret = CreateClientSharedSecret()
+            LabName = existingSettings?.LabName ?? HostConfiguration.Default.LabName
         };
 
         WriteSettings(settings);
-    }
-
-    public string GetClientSharedSecret()
-    {
-        HostSettings? settings = ReadSettings() ?? throw new InvalidOperationException(
-            "Password Host belum dikonfigurasi.");
-
-        if (!string.IsNullOrWhiteSpace(settings.ClientSharedSecret))
-            return settings.ClientSharedSecret;
-
-        var upgradedSettings = new HostSettings
-        {
-            PasswordHash = settings.PasswordHash,
-            PasswordSalt = settings.PasswordSalt,
-            PasswordIterations = settings.PasswordIterations,
-            ClientSharedSecret = CreateClientSharedSecret(),
-            LabName = settings.LabName,
-            TcpPort = settings.TcpPort
-        };
-        WriteSettings(upgradedSettings);
-        return upgradedSettings.ClientSharedSecret;
     }
 
     public HostConfiguration GetConfiguration()
     {
         HostSettings? settings = ReadSettings() ?? throw new InvalidOperationException(
             "Password Host belum dikonfigurasi.");
-        return new HostConfiguration(
+        var configuration = new HostConfiguration(
             string.IsNullOrWhiteSpace(settings.LabName)
                 ? HostConfiguration.Default.LabName
-                : settings.LabName,
-            settings.TcpPort is > 0 and <= 65535
-                ? settings.TcpPort
-                : HostConfiguration.Default.TcpPort);
+                : settings.LabName);
+
+        if (ContainsLegacyNetworkSettings())
+        {
+            WriteSettings(new HostSettings
+            {
+                PasswordHash = settings.PasswordHash,
+                PasswordSalt = settings.PasswordSalt,
+                PasswordIterations = settings.PasswordIterations,
+                LabName = configuration.LabName
+            });
+        }
+
+        return configuration;
     }
 
     public void SaveConfiguration(HostConfiguration configuration)
     {
-        if (string.IsNullOrWhiteSpace(configuration.LabName) ||
-            configuration.TcpPort is < 1 or > 65535)
+        if (string.IsNullOrWhiteSpace(configuration.LabName))
         {
             throw new ArgumentException("Konfigurasi Host tidak valid.");
         }
@@ -99,28 +88,8 @@ public sealed class HostPasswordManager
             PasswordHash = settings.PasswordHash,
             PasswordSalt = settings.PasswordSalt,
             PasswordIterations = settings.PasswordIterations,
-            ClientSharedSecret = settings.ClientSharedSecret,
-            LabName = configuration.LabName.Trim(),
-            TcpPort = configuration.TcpPort
+            LabName = configuration.LabName.Trim()
         });
-    }
-
-    public string RotateClientSharedSecret()
-    {
-        HostSettings? settings = ReadSettings() ?? throw new InvalidOperationException(
-            "Password Host belum dikonfigurasi.");
-
-        var rotatedSettings = new HostSettings
-        {
-            PasswordHash = settings.PasswordHash,
-            PasswordSalt = settings.PasswordSalt,
-            PasswordIterations = settings.PasswordIterations,
-            ClientSharedSecret = CreateClientSharedSecret(),
-            LabName = settings.LabName,
-            TcpPort = settings.TcpPort
-        };
-        WriteSettings(rotatedSettings);
-        return rotatedSettings.ClientSharedSecret;
     }
 
     private void WriteSettings(HostSettings settings)
@@ -174,9 +143,6 @@ public sealed class HostPasswordManager
         Rfc2898DeriveBytes.Pbkdf2(
             password, salt, iterations, HashAlgorithmName.SHA256, HashLength);
 
-    private static string CreateClientSharedSecret() =>
-        Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-
     private static void ValidateNewPassword(string password)
     {
         if (string.IsNullOrWhiteSpace(password) || password.Length < 6)
@@ -215,13 +181,29 @@ public sealed class HostPasswordManager
         }
     }
 
+    private bool ContainsLegacyNetworkSettings()
+    {
+        try
+        {
+            string json = File.ReadAllText(_settingsPath);
+            return json.Contains(
+                       "\"ClientSharedSecret\"",
+                       StringComparison.OrdinalIgnoreCase) ||
+                   json.Contains(
+                       "\"TcpPort\"",
+                       StringComparison.OrdinalIgnoreCase);
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+    }
+
     private sealed class HostSettings
     {
         public string PasswordHash { get; init; } = string.Empty;
         public string PasswordSalt { get; init; } = string.Empty;
         public int PasswordIterations { get; init; }
-        public string ClientSharedSecret { get; init; } = string.Empty;
         public string LabName { get; init; } = HostConfiguration.Default.LabName;
-        public int TcpPort { get; init; } = HostConfiguration.Default.TcpPort;
     }
 }

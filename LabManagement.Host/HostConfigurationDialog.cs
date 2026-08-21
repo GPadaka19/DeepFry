@@ -6,7 +6,6 @@ namespace LabManagement.Host;
 public sealed class HostConfigurationDialog : Window
 {
     private readonly TextBox _labNameBox;
-    private readonly TextBox _portBox;
 
     public HostConfigurationDialog(HostConfiguration configuration)
     {
@@ -18,14 +17,11 @@ public sealed class HostConfigurationDialog : Window
 
         var panel = new StackPanel { Margin = new Thickness(20) };
         panel.Children.Add(new TextBlock { Text = "Nama lab" });
-        _labNameBox = new TextBox { Text = configuration.LabName, Margin = new Thickness(0, 4, 0, 12) };
+        _labNameBox = new TextBox { Text = configuration.LabName, Margin = new Thickness(0, 4, 0, 4) };
         panel.Children.Add(_labNameBox);
-        panel.Children.Add(new TextBlock { Text = "TCP port" });
-        _portBox = new TextBox { Text = configuration.TcpPort.ToString(), Margin = new Thickness(0, 4, 0, 4) };
-        panel.Children.Add(_portBox);
         panel.Children.Add(new TextBlock
         {
-            Text = "Perubahan port berlaku setelah Host dijalankan ulang.",
+            Text = "Host memindai Client pada subnet lokal melalui TCP port 5020.",
             Foreground = System.Windows.Media.Brushes.Gray,
             TextWrapping = TextWrapping.Wrap
         });
@@ -44,14 +40,13 @@ public sealed class HostConfigurationDialog : Window
 
     private void Save_Click(object sender, RoutedEventArgs e)
     {
-        if (string.IsNullOrWhiteSpace(_labNameBox.Text) ||
-            !int.TryParse(_portBox.Text, out int port) || port is < 1 or > 65535)
+        if (string.IsNullOrWhiteSpace(_labNameBox.Text))
         {
-            MessageBox.Show("Nama lab dan TCP port 1–65535 wajib valid.", Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show("Nama lab wajib diisi.", Title, MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
-        Configuration = new HostConfiguration(_labNameBox.Text.Trim(), port);
+        Configuration = new HostConfiguration(_labNameBox.Text.Trim());
         DialogResult = true;
     }
 }

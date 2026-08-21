@@ -22,16 +22,6 @@
                     DockPanel.Dock="Right"
                     Padding="12,6"
                     Margin="0,0,8,0"/>
-            <Button Content="Client Pairing Key"
-                    Click="ClientPairingKey_Click"
-                    DockPanel.Dock="Right"
-                    Padding="12,6"
-                    Margin="0,0,8,0"/>
-            <Button Content="Reset Pairing Key"
-                    Click="ResetClientPairingKey_Click"
-                    DockPanel.Dock="Right"
-                    Padding="12,6"
-                    Margin="0,0,8,0"/>
             <Button Content="Settings"
                     Click="Settings_Click"
                     DockPanel.Dock="Right"

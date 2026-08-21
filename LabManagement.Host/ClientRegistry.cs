@@ -92,6 +92,14 @@ namespace LabManagement.Host
             return activeConnections;
         }
 
+        public IReadOnlySet<string> GetConnectedIpAddresses() =>
+            _clients
+                .Where(client =>
+                    client.Status == "Online" &&
+                    client.Connection is not null)
+                .Select(client => client.IpAddress)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
         public int OnlineCount =>
             _clients.Count(x => x.Status == "Online");
     }

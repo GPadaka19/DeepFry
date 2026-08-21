@@ -43,14 +43,6 @@ namespace LabManagement.Host
             TcpClient client,
             CancellationToken cancellationToken)
         {
-            return await AcceptAsync(client, null, cancellationToken);
-        }
-
-        public static async Task<ClientConnection?> AcceptAsync(
-            TcpClient client,
-            string? sharedSecret,
-            CancellationToken cancellationToken)
-        {
             NetworkStream stream = client.GetStream();
             var reader = new JsonLineReader(stream);
             string? line;
@@ -101,22 +93,11 @@ namespace LabManagement.Host
                 return null;
             }
 
-            var connection = new ClientConnection(
+            return new ClientConnection(
                 client,
                 stream,
                 reader,
                 registration);
-
-            if (string.IsNullOrEmpty(sharedSecret) ||
-                await connection.AuthenticateAsync(
-                    sharedSecret,
-                    cancellationToken))
-            {
-                return connection;
-            }
-
-            connection.Dispose();
-            return null;
         }
 
         public Task<ResponseMessage> SendCommandAsync(
@@ -232,51 +213,6 @@ namespace LabManagement.Host
             _reader.Dispose();
             _stream.Dispose();
             _client.Dispose();
-        }
-
-        private async Task<bool> AuthenticateAsync(
-            string sharedSecret,
-            CancellationToken cancellationToken)
-        {
-            string challenge = SharedSecretAuthenticator.CreateChallenge();
-            RequestMessage request = RequestMessage.Create(
-                MessageType.AuthChallenge,
-                new AuthChallengePayload { Challenge = challenge });
-
-            try
-            {
-                await _writer.WriteAsync(request, cancellationToken);
-                string? line = await _reader.ReadLineAsync(cancellationToken)
-                    .WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
-
-                ResponseMessage? response = line is null
-                    ? null
-                    : JsonSerializer.Deserialize<ResponseMessage>(
-                        line,
-                        ProtocolJson.Options);
-
-                return response is not null &&
-                    response.Success &&
-                    response.RequestId == request.RequestId &&
-                    response.GetPayload<AuthProofPayload>() is { } proof &&
-                    SharedSecretAuthenticator.VerifyProof(
-                        sharedSecret,
-                        challenge,
-                        Hostname,
-                        proof.Proof);
-            }
-            catch (InvalidDataException)
-            {
-                return false;
-            }
-            catch (JsonException)
-            {
-                return false;
-            }
-            catch (TimeoutException)
-            {
-                return false;
-            }
         }
 
         private async Task<ResponseMessage> SendRequestAsync(

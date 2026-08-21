@@ -4,7 +4,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <UserSecretsId>dotnet-LabManagement.Client-76526def-ce94-4110-be1d-e2fc29c3b11e</UserSecretsId>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,7 +13,4 @@
     <ProjectReference Include="../LabManagement.Protocol/LabManagement.Protocol.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Update=".env" CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
 </Project>

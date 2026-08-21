@@ -3,25 +3,19 @@ param(
     [Parameter(Mandatory)]
     [string]$ExecutablePath,
 
-    [Parameter(Mandatory)]
-    [string]$SharedSecret,
-
     [switch]$Start
 )
 
 $serviceName = 'LabManagement Client'
 $resolvedExecutablePath = (Resolve-Path -LiteralPath $ExecutablePath).Path
 
-try {
-    $keyBytes = [Convert]::FromBase64String($SharedSecret)
-    if ($keyBytes.Length -lt 32) { throw 'too short' }
-}
-catch {
-    throw 'SharedSecret harus berupa Client Pairing Key valid dari Host.'
-}
-
 if (-not $resolvedExecutablePath.EndsWith('.exe', [StringComparison]::OrdinalIgnoreCase)) {
     throw 'ExecutablePath harus menunjuk ke LabManagement.Client.exe.'
+}
+
+$legacySettingsPath = Join-Path $env:ProgramData 'LabManagement\Client\client-settings.json'
+if (Test-Path -LiteralPath $legacySettingsPath) {
+    Remove-Item -LiteralPath $legacySettingsPath -Force
 }
 
 $existingService = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
@@ -36,20 +30,15 @@ New-Service `
     -BinaryPathName ('"{0}"' -f $resolvedExecutablePath) `
     -StartupType Automatic
 
-$settingsDirectory = Join-Path $env:ProgramData 'LabManagement\Client'
-$settingsPath = Join-Path $settingsDirectory 'client-settings.json'
-New-Item -ItemType Directory -Force -Path $settingsDirectory | Out-Null
-@{ SharedSecret = $SharedSecret } |
-    ConvertTo-Json |
-    Set-Content -LiteralPath $settingsPath -Encoding UTF8
-
-$settingsAcl = Get-Acl -LiteralPath $settingsPath
-$settingsAcl.SetAccessRuleProtection($true, $false)
-$settingsAcl.SetAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule(
-    'SYSTEM', 'FullControl', 'Allow')))
-$settingsAcl.SetAccessRule((New-Object System.Security.AccessControl.FileSystemAccessRule(
-    'BUILTIN\Administrators', 'FullControl', 'Allow')))
-Set-Acl -LiteralPath $settingsPath -AclObject $settingsAcl
+if (-not (Get-NetFirewallRule -DisplayName 'Deep Fry Client TCP 5020' -ErrorAction SilentlyContinue)) {
+    New-NetFirewallRule `
+        -DisplayName 'Deep Fry Client TCP 5020' `
+        -Direction Inbound `
+        -Action Allow `
+        -Protocol TCP `
+        -LocalPort 5020 `
+        -RemoteAddress LocalSubnet | Out-Null
+}
 
 & sc.exe failure 'LabManagement Client' reset= 86400 actions= restart/5000/restart/5000/restart/5000 | Out-Null
 
