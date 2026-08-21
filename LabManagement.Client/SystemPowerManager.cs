@@ -31,7 +31,7 @@ public sealed class SystemPowerManager : ISystemPowerManager
             "/d",
             "p:0:0",
             "/c",
-            "Restart requested by Deep Fry"
+            "Restart requested by Deep Fry - 22.11.5020"
         })
         {
             startInfo.ArgumentList.Add(argument);
