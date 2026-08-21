@@ -5,10 +5,14 @@ namespace LabManagement.Client;
 public sealed class ClientCommandDispatcher : IClientCommandDispatcher
 {
     private readonly IUwfManager _uwfManager;
+    private readonly ISystemPowerManager _systemPowerManager;
 
-    public ClientCommandDispatcher(IUwfManager uwfManager)
+    public ClientCommandDispatcher(
+        IUwfManager uwfManager,
+        ISystemPowerManager systemPowerManager)
     {
         _uwfManager = uwfManager;
+        _systemPowerManager = systemPowerManager;
     }
 
     public async Task<ResponseMessage> DispatchAsync(
@@ -43,6 +47,9 @@ public sealed class ClientCommandDispatcher : IClientCommandDispatcher
                 "uwf.unlock" => ResponseMessage.CreateSuccess(
                     request.RequestId,
                     await _uwfManager.UnlockDriveCAsync(cancellationToken)),
+                "system.restart" => ResponseMessage.CreateSuccess(
+                    request.RequestId,
+                    await _systemPowerManager.RestartAsync(cancellationToken)),
                 _ => ResponseMessage.CreateError(
                     request.RequestId,
                     new ErrorInfo
@@ -61,7 +68,11 @@ public sealed class ClientCommandDispatcher : IClientCommandDispatcher
                 request.RequestId,
                 new ErrorInfo
                 {
-                    Code = "UWF_COMMAND_FAILED",
+                    Code = command.Name.StartsWith(
+                        "uwf.",
+                        StringComparison.Ordinal)
+                        ? "UWF_COMMAND_FAILED"
+                        : "SYSTEM_COMMAND_FAILED",
                     Message = ex.Message
                 });
         }

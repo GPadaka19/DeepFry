@@ -380,7 +380,7 @@ CommandDispatcher
        |
        +---- uwf.unlock
        |
-       +---- system.reboot
+       +---- system.restart
        |
        +---- system.shutdown
 ```
@@ -490,6 +490,8 @@ Important:
 - Use a strict command allowlist.
 - `uwf.lock` maps only to the intended UWF command.
 - `uwf.unlock` maps only to the intended UWF command.
+- `system.restart` maps only to Windows restart and must be triggered separately
+  from UWF Lock/Unlock after target selection and Host confirmation.
 - Capture exit code.
 - Capture stdout/stderr.
 - Return structured result to Host.

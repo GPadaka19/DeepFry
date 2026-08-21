@@ -36,6 +36,7 @@ nama komputer atau pairing key yang perlu dikonfigurasi.
 - Daftar hostname, IP, koneksi, status UWF, dan hasil command.
 - Seleksi satu/banyak/semua Client.
 - `Refresh UWF Status`, `Lock Selected`, dan `Unlock Selected`.
+- `Restart Selected` untuk me-restart PC target secara eksplisit.
 - Client dapat dijalankan langsung atau dipasang sebagai Windows Service.
 - Firewall Client TCP 5020 dibatasi ke `LocalSubnet`.
 
@@ -183,6 +184,12 @@ Jika gagal:
 - pastikan network profile dan switch lab mengizinkan komunikasi antarkomputer.
 
 UWF wajib diuji pada image Windows lab sebenarnya sebelum operasi massal.
+
+Perintah Lock/Unlock hanya mengubah konfigurasi UWF dan tidak pernah melakukan
+restart otomatis. Untuk menerapkan perubahan, pilih PC target, klik
+**Restart Selected**, lalu setujui dialog konfirmasi. Client menjadwalkan
+restart lima detik setelah command diterima agar hasil command sempat dikirim
+kembali ke Host.
 
 ---
 

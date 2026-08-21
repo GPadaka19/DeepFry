@@ -303,6 +303,9 @@ static void TestMainWindowLayout()
                 window.Title == "Deep Fry v2.0.0",
                 "Host title no longer preserves the Deep Fry identity.");
             Assert(
+                window.FindName("RestartSelectedButton") is Button,
+                "Host restart action is missing from the main window.");
+            Assert(
                 grid.RowHeaderWidth == 0,
                 "DataGrid row header still creates a left-side gutter.");
             Assert(
@@ -380,7 +383,10 @@ static void TestProtocolContract()
 
 static async Task TestCommandDispatcherAsync()
 {
-    var dispatcher = new ClientCommandDispatcher(new FakeUwfManager());
+    var systemPowerManager = new FakeSystemPowerManager();
+    var dispatcher = new ClientCommandDispatcher(
+        new FakeUwfManager(),
+        systemPowerManager);
 
     ResponseMessage statusResponse = await dispatcher.DispatchAsync(
         RequestMessage.Create(
@@ -395,6 +401,20 @@ static async Task TestCommandDispatcherAsync()
     Assert(
         statusResponse.Success && status?.State == UwfState.Locked,
         "UWF status command was not dispatched.");
+
+    ResponseMessage restartResponse = await dispatcher.DispatchAsync(
+        RequestMessage.Create(
+            MessageType.Command,
+            new CommandRequestPayload { Name = "system.restart" },
+            "restart-1"),
+        CancellationToken.None);
+
+    Assert(
+        restartResponse.Success &&
+        systemPowerManager.RestartCallCount == 1 &&
+        restartResponse.GetPayload<CommandResultPayload>()?.Details ==
+            "Restart scheduled.",
+        "System restart command was not dispatched through its safe manager.");
 
     ResponseMessage rejectedResponse = await dispatcher.DispatchAsync(
         RequestMessage.Create(
@@ -423,7 +443,9 @@ static async Task TestHostDiscoversClientAsync()
             sessionCancellation.Token);
         await ClientSession.RunAsync(
             host,
-            new ClientCommandDispatcher(new FakeUwfManager()),
+            new ClientCommandDispatcher(
+                new FakeUwfManager(),
+                new FakeSystemPowerManager()),
             sessionCancellation.Token);
     });
 
@@ -885,5 +907,20 @@ file sealed class FakeUwfManager : IUwfManager
         CancellationToken cancellationToken)
     {
         return Task.FromResult(new CommandResultPayload());
+    }
+}
+
+file sealed class FakeSystemPowerManager : ISystemPowerManager
+{
+    public int RestartCallCount { get; private set; }
+
+    public Task<CommandResultPayload> RestartAsync(
+        CancellationToken cancellationToken)
+    {
+        RestartCallCount++;
+        return Task.FromResult(new CommandResultPayload
+        {
+            Details = "Restart scheduled."
+        });
     }
 }

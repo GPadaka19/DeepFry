@@ -255,23 +255,40 @@ namespace LabManagement.Host
             await ExecuteProtectedCommandAsync("uwf.unlock", "unlock");
         }
 
+        private async void RestartSelected_Click(
+            object sender,
+            RoutedEventArgs e)
+        {
+            List<ClientInfo> targets = GetSelectedOnlineClients();
+
+            if (targets.Count == 0)
+            {
+                ShowNoSelectedOnlineClients();
+                return;
+            }
+
+            MessageBoxResult confirmation = MessageBox.Show(
+                $"Restart {targets.Count} PC yang dipilih sekarang? " +
+                "Pekerjaan yang belum disimpan pada PC target akan hilang.",
+                "Konfirmasi restart PC",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (confirmation != MessageBoxResult.Yes)
+                return;
+
+            await ExecuteCommandAsync("system.restart", targets);
+        }
+
         private async Task ExecuteProtectedCommandAsync(
             string commandName,
             string actionName)
         {
-            List<ClientInfo> targets = _clients.Clients
-                .Where(client =>
-                    client.IsSelected &&
-                    client.Status == "Online")
-                .ToList();
+            List<ClientInfo> targets = GetSelectedOnlineClients();
 
             if (targets.Count == 0)
             {
-                MessageBox.Show(
-                    "Pilih minimal satu PC yang sedang Online.",
-                    "LabManagement",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
+                ShowNoSelectedOnlineClients();
                 return;
             }
 
@@ -286,6 +303,22 @@ namespace LabManagement.Host
                 return;
 
             await ExecuteCommandAsync(commandName, targets);
+        }
+
+        private List<ClientInfo> GetSelectedOnlineClients() =>
+            _clients.Clients
+                .Where(client =>
+                    client.IsSelected &&
+                    client.Status == "Online")
+                .ToList();
+
+        private static void ShowNoSelectedOnlineClients()
+        {
+            MessageBox.Show(
+                "Pilih minimal satu PC yang sedang Online.",
+                "LabManagement",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
         }
 
         private async Task ExecuteCommandAsync(
@@ -357,7 +390,9 @@ namespace LabManagement.Host
                     response.GetPayload<CommandResultPayload>();
 
                 client.LastResult = result?.Details ?? "Completed.";
-                client.UwfState = UwfState.Checking;
+
+                if (commandName.StartsWith("uwf.", StringComparison.Ordinal))
+                    client.UwfState = UwfState.Checking;
             }
             catch (TimeoutException)
             {
