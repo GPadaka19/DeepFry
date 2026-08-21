@@ -32,6 +32,7 @@ else
     TestPasswordSetupSubmission();
     TestHostPasswordManager();
     TestUwfStatusResultFormatting();
+    TestUwfStatusParserUsesUwfMgrLabels();
     await TestCommandDispatcherAsync();
     await TestHostDiscoversClientAsync();
     await TestHeartbeatTimeoutAndDisconnectAsync();
@@ -243,6 +244,85 @@ static void TestUwfStatusResultFormatting()
         MainWindow.FormatUwfStatusResult(UwfState.Unlocked) == "Off" &&
         MainWindow.FormatUwfStatusResult(UwfState.Unknown) == "Unknown",
         "UWF status result was not reduced to On, Off, or Unknown.");
+}
+
+static void TestUwfStatusParserUsesUwfMgrLabels()
+{
+    const string capturedProtectedOutput = """
+        Unified Write Filter Configuration Utility version 10.0.26200
+        Copyright (C) Microsoft Corporation. All rights reserved.
+
+        Current Session Settings
+
+        FILTER SETTINGS
+            Filter state:     ON
+
+        VOLUME SETTINGS
+        Volume 38c97866-e219-45c5-a3fc-6e2630a87435 [C:]
+            Volume state:     Protected
+            Volume ID:        38c97866-e219-45c5-a3fc-6e2630a87435
+
+        Next Session Settings
+
+        FILTER SETTINGS
+            Filter state:     ON
+
+        VOLUME SETTINGS
+        Volume 38c97866-e219-45c5-a3fc-6e2630a87435 [C:]
+            Volume state:     Protected
+            Volume ID:        38c97866-e219-45c5-a3fc-6e2630a87435
+        """;
+
+    UwfStatusPayload enabledStatus = UwfManager.ParseStatus(
+        capturedProtectedOutput,
+        string.Empty);
+
+    const string disabledFilterOutput = """
+        Current Session Settings
+
+        FILTER SETTINGS
+            Filter state:     OFF
+
+        Next Session Settings
+
+        FILTER SETTINGS
+            Filter state:     ON
+        """;
+    const string unprotectedVolumeOutput = """
+        Current Session Settings
+
+        VOLUME SETTINGS
+        Volume 00000000-0000-0000-0000-000000000000 [C:]
+            Volume state:     Unprotected
+
+        Next Session Volume Settings
+        Volume 00000000-0000-0000-0000-000000000000 [C:]
+            Volume state:     Protected
+        """;
+
+    UwfStatusPayload disabledStatus = UwfManager.ParseStatus(
+        disabledFilterOutput,
+        unprotectedVolumeOutput);
+    UwfStatusPayload disabledFilterStatus = UwfManager.ParseStatus(
+        disabledFilterOutput,
+        capturedProtectedOutput);
+    UwfStatusPayload unprotectedVolumeStatus = UwfManager.ParseStatus(
+        capturedProtectedOutput,
+        unprotectedVolumeOutput);
+
+    Assert(
+        enabledStatus.State == UwfState.Locked &&
+        enabledStatus.FilterEnabled == true &&
+        enabledStatus.DriveCProtected == true &&
+        disabledStatus.State == UwfState.Unlocked &&
+        disabledStatus.FilterEnabled == false &&
+        disabledStatus.DriveCProtected == false &&
+        disabledFilterStatus.State == UwfState.Unlocked &&
+        unprotectedVolumeStatus.State == UwfState.Unlocked &&
+        unprotectedVolumeStatus.FilterEnabled == true &&
+        unprotectedVolumeStatus.DriveCProtected == false,
+        "UWF status parser did not understand uwfmgr Filter state and " +
+        "Volume state output.");
 }
 
 static void TestMainWindowStartup()

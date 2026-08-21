@@ -26,17 +26,31 @@ public sealed class UwfManager : IUwfManager
                 $"uwfmgr get-config failed. {details}");
         }
 
-        bool? filterEnabled = FindBoolean(
+        return ParseStatus(
             filter.StandardOutput,
-            "filter\\s+enabled");
-        bool? driveCProtected = FindBoolean(
             volume.StandardOutput,
-            "(?:volume\\s+)?protected");
+            details);
+    }
 
-        UwfState state = driveCProtected switch
+    internal static UwfStatusPayload ParseStatus(
+        string filterOutput,
+        string volumeOutput,
+        string details = "")
+    {
+        bool? filterEnabled = FindBoolean(
+            filterOutput,
+            "filter\\s+(?:enabled|state)");
+        bool? driveCProtected =
+            FindDriveCProtection(volumeOutput) ??
+            FindDriveCProtection(filterOutput) ??
+            FindBoolean(
+                volumeOutput,
+                "(?:volume\\s+state|(?:volume\\s+)?protected)");
+
+        UwfState state = (filterEnabled, driveCProtected) switch
         {
-            true when filterEnabled is not false => UwfState.Locked,
-            false => UwfState.Unlocked,
+            (true, true) => UwfState.Locked,
+            (false, _) or (_, false) => UwfState.Unlocked,
             _ => UwfState.Unknown
         };
 
@@ -134,19 +148,38 @@ public sealed class UwfManager : IUwfManager
     {
         Match match = Regex.Match(
             text,
-            $"{label}\\s*:\\s*(?<value>yes|no|on|off|true|false|enabled|disabled)",
+            $"{label}\\s*:\\s*(?<value>" +
+            "yes|no|on|off|true|false|enabled|disabled|" +
+            "protected|unprotected)",
             RegexOptions.IgnoreCase);
 
         if (!match.Success)
             return null;
 
-        return match.Groups["value"].Value.ToLowerInvariant() switch
+        return ParseBooleanValue(match.Groups["value"].Value);
+    }
+
+    private static bool? FindDriveCProtection(string text)
+    {
+        Match match = Regex.Match(
+            text,
+            "^\\s*volume[^\\r\\n]*\\[c:\\][^\\r\\n]*\\r?\\n" +
+            "\\s*volume\\s+state\\s*:\\s*" +
+            "(?<value>protected|unprotected)\\b",
+            RegexOptions.IgnoreCase | RegexOptions.Multiline);
+
+        return match.Success
+            ? ParseBooleanValue(match.Groups["value"].Value)
+            : null;
+    }
+
+    private static bool? ParseBooleanValue(string value) =>
+        value.ToLowerInvariant() switch
         {
-            "yes" or "on" or "true" or "enabled" => true,
-            "no" or "off" or "false" or "disabled" => false,
+            "yes" or "on" or "true" or "enabled" or "protected" => true,
+            "no" or "off" or "false" or "disabled" or "unprotected" => false,
             _ => null
         };
-    }
 
     private static string JoinOutput(params UwfCommandResult[] results)
     {
