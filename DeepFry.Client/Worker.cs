@@ -34,7 +34,8 @@ public sealed class Worker : BackgroundService
         {
             listener.Start();
             _logger.LogInformation(
-                "DeepFry Client aktif pada TCP port {port}. Hostname: {hostname}",
+                "DeepFry Client v{version} aktif pada TCP port {port}. Hostname: {hostname}",
+                ClientVersion.Display,
                 ListenPort,
                 Environment.MachineName);
 

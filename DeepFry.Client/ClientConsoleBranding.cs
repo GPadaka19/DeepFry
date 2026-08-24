@@ -20,6 +20,7 @@ internal static class ClientConsoleBranding
             Console.WriteLine(" [ Project ] Deep Fry UWF Monitoring & Control Client");
             Console.WriteLine(" [ Author  ] Gusti Padaka (22.11.5020)");
             Console.WriteLine(" [ For     ] UPT Laboratorium Amikom Yogyakarta");
+            Console.WriteLine($" [ Version ] Deep Fry v{ClientVersion.Display}");
             Console.WriteLine(" ----------------------------------------------------------------");
         }
         catch (IOException)
