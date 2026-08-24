@@ -590,7 +590,7 @@ static void TestMainWindowLayout()
             DataGrid grid = (DataGrid)window.FindName("ClientGrid");
 
             Assert(
-                window.Title == "Deep Fry v3.0.0",
+                window.Title == "Deep Fry v3.1.0",
                 "Host title no longer preserves the Deep Fry identity.");
             Assert(
                 window.FindName("RestartSelectedButton") is Button,
