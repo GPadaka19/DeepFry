@@ -190,6 +190,35 @@ Get-Service -Name "DeepFry Client"
 Restart-Service -Name "DeepFry Client"
 ```
 
+### Perawatan jarak jauh via NetSupport
+
+Perintah berikut dijalankan dari NetSupport (kotak *Execute Command* /
+*Run Command*) pada PC mahasiswa. Client umumnya berjalan langsung (tanpa
+service), sehingga perintah memakai nama proses EXE.
+
+Hapus seluruh data dan log Client (tidak menghapus EXE). Jika Client
+terpasang sebagai service, hentikan dulu:
+
+```bat
+"cmd.exe" /c "net stop "DeepFry Client" & rmdir /S /Q C:\ProgramData\DeepFry"
+```
+
+Hapus EXE Client dari PC (hentikan proses yang berjalan lalu hapus file):
+
+```bat
+"cmd.exe" /c "taskkill /F /IM DeepFry.Client.exe 2>nul & del /F /Q D:\DeepFry.Client.exe"
+```
+
+Jalankan Client:
+
+```bat
+"D:\DeepFry.Client.exe"
+```
+
+> **PC dengan versi lama `LabManagement` (v2.2.4 ke bawah):** gunakan nama
+> lama pada perintah di atas — service `LabManagement Client`, proses
+> `LabManagement.Client.exe`, dan folder data `C:\ProgramData\LabManagement`.
+
 ### Reset password Host yang terlupa
 
 Password Host tetap sama setelah aplikasi diperbarui karena hash password dan
@@ -212,6 +241,19 @@ Jalankan kembali `DeepFry.Host.exe`. Host akan meminta pembuatan password
 baru seperti pada penggunaan pertama. Nama lab juga perlu diisi ulang melalui
 **Lab Settings**. File konfigurasi lama hanya diubah namanya sehingga masih
 dapat dipulihkan jika diperlukan.
+
+## Lokasi log dan data
+
+Log diagnostik dan data aplikasi disimpan di folder `ProgramData`, bukan
+di folder EXE, sehingga tidak hilang saat aplikasi diperbarui.
+
+| Komponen | Log | Data lain |
+|---|---|---|
+| Host | `C:\ProgramData\DeepFry\logs\host.log` | `C:\ProgramData\DeepFry\host-settings.json` |
+| Client | `C:\ProgramData\DeepFry\logs\client.log` | `C:\ProgramData\DeepFry\client-settings.json` |
+
+Setiap log otomatis dirotasi saat mencapai 5 MB menjadi `<nama>.previous`
+(mis. `host.log.previous`).
 
 ## Troubleshooting
 
