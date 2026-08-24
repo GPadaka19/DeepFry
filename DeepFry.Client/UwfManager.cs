@@ -100,26 +100,33 @@ public sealed class UwfManager : IUwfManager
     {
         string normalizedOutput = NormalizeConsoleOutput(output);
         string currentSession = ExtractCurrentSession(normalizedOutput);
+        string nextSession = ExtractNextSession(normalizedOutput);
         bool? filterEnabled = FindBoolean(
             currentSession,
             "filter\\s+state");
         bool? driveCProtected = FindDriveCProtection(currentSession);
+        bool? nextDriveCProtected = FindDriveCProtection(nextSession);
 
-        UwfState state = driveCProtected switch
-        {
-            true => UwfState.Locked,
-            false => UwfState.Unlocked,
-            _ => UwfState.Unknown
-        };
+        UwfState state = ToState(driveCProtected);
+        UwfState nextState = ToState(nextDriveCProtected);
 
         return new UwfStatusPayload
         {
             State = state,
+            NextSessionState = nextState,
             FilterEnabled = filterEnabled,
             DriveCProtected = driveCProtected,
             Details = details
         };
     }
+
+    private static UwfState ToState(bool? protectedValue) =>
+        protectedValue switch
+        {
+            true => UwfState.Locked,
+            false => UwfState.Unlocked,
+            _ => UwfState.Unknown
+        };
 
     public async Task<CommandResultPayload> LockDriveCAsync(
         CancellationToken cancellationToken)
@@ -259,6 +266,21 @@ public sealed class UwfManager : IUwfManager
         return nextStart < 0
             ? output[currentStart..]
             : output[currentStart..nextStart];
+    }
+
+    private static string ExtractNextSession(string output)
+    {
+        const string nextHeader = "Next Session Settings";
+
+        int nextStart = output.IndexOf(
+            nextHeader,
+            StringComparison.OrdinalIgnoreCase);
+
+        if (nextStart < 0)
+            return string.Empty;
+
+        nextStart += nextHeader.Length;
+        return output[nextStart..];
     }
 
     private static string NormalizeConsoleOutput(string output)

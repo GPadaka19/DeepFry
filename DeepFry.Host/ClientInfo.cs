@@ -12,6 +12,7 @@ public sealed class ClientInfo : INotifyPropertyChanged
     private ClientConnection? _connection;
     private bool _isSelected;
     private UwfState _uwfState = UwfState.Unknown;
+    private UwfState _uwfNextSessionState = UwfState.Unknown;
     private string _lastResult = string.Empty;
 
     public string Hostname { get; set; } = string.Empty;
@@ -61,6 +62,28 @@ public sealed class ClientInfo : INotifyPropertyChanged
     }
 
     public string UwfStatusText => _uwfState switch
+    {
+        UwfState.Locked => "Protected",
+        UwfState.Unlocked => "Un-protected",
+        UwfState.Checking => "Checking...",
+        _ => "Unknown"
+    };
+
+    public UwfState UwfNextSessionState
+    {
+        get => _uwfNextSessionState;
+        set
+        {
+            if (!SetField(ref _uwfNextSessionState, value))
+                return;
+
+            PropertyChanged?.Invoke(
+                this,
+                new PropertyChangedEventArgs(nameof(UwfStatusAfterRestartText)));
+        }
+    }
+
+    public string UwfStatusAfterRestartText => _uwfNextSessionState switch
     {
         UwfState.Locked => "Protected",
         UwfState.Unlocked => "Un-protected",

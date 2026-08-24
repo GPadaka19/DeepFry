@@ -404,12 +404,14 @@ namespace DeepFry.Host
                     }
 
                     client.UwfState = status.State;
+                    client.UwfNextSessionState = status.NextSessionState;
                     client.LastResult = FormatUwfStatusResult(status.State);
                     DiagnosticLog.Write(
                         "UWF status response",
                         $"Hostname={client.Hostname}{Environment.NewLine}" +
                         $"IpAddress={client.IpAddress}{Environment.NewLine}" +
                         $"State={status.State}{Environment.NewLine}" +
+                        $"NextSessionState={status.NextSessionState}{Environment.NewLine}" +
                         $"FilterEnabled={status.FilterEnabled}{Environment.NewLine}" +
                         $"DriveCProtected={status.DriveCProtected}{Environment.NewLine}" +
                         $"Details:{Environment.NewLine}{status.Details}");

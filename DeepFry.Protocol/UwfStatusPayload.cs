@@ -4,6 +4,8 @@ public sealed class UwfStatusPayload
 {
     public UwfState State { get; init; } = UwfState.Unknown;
 
+    public UwfState NextSessionState { get; init; } = UwfState.Unknown;
+
     public bool? FilterEnabled { get; init; }
 
     public bool? DriveCProtected { get; init; }

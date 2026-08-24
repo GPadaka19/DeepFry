@@ -434,8 +434,10 @@ static void TestUwfStatusParserUsesCurrentDriveCVolumeState()
         unprotectedVolumeStatus.State == UwfState.Unlocked &&
         unprotectedVolumeStatus.FilterEnabled == true &&
         unprotectedVolumeStatus.DriveCProtected == false &&
+        unprotectedVolumeStatus.NextSessionState == UwfState.Locked &&
         nextSessionOnlyStatus.State == UwfState.Unknown &&
-        nextSessionOnlyStatus.DriveCProtected is null,
+        nextSessionOnlyStatus.DriveCProtected is null &&
+        nextSessionOnlyStatus.NextSessionState == UwfState.Locked,
         "UWF status parser did not derive On or Off from drive C in the " +
         "Current Session volume settings.");
 }
@@ -471,7 +473,8 @@ static void TestUwfStatusParserHandlesConsoleControlCharacters()
 
     Assert(
         status.State == UwfState.Unlocked &&
-        status.DriveCProtected == false,
+        status.DriveCProtected == false &&
+        status.NextSessionState == UwfState.Locked,
         "UWF status parser did not tolerate console control characters " +
         "in the current Volume state output.");
 }
