@@ -1,13 +1,13 @@
-# Deep Fry — LabManagement
+# Deep Fry
 
 Deep Fry adalah aplikasi internal UPT Lab Universitas Amikom Yogyakarta untuk
 memantau dan mengendalikan UWF pada PC laboratorium Windows.
 
 Sistem terdiri dari:
 
-- `LabManagement.Host`: dashboard WPF pada PC staff dengan alamat lab `.90`.
-- `LabManagement.Client`: listener ringan pada setiap PC mahasiswa.
-- `LabManagement.Protocol`: kontrak JSON newline-delimited yang dipakai keduanya.
+- `DeepFry.Host`: dashboard WPF pada PC staff dengan alamat lab `.90`.
+- `DeepFry.Client`: listener ringan pada setiap PC mahasiswa.
+- `DeepFry.Protocol`: kontrak JSON newline-delimited yang dipakai keduanya.
 
 ## Topologi jaringan
 
@@ -60,14 +60,14 @@ dapat mengubah atau menghentikan aplikasi.
 ## Build
 
 ```powershell
-dotnet restore LabManagement.sln
-dotnet build LabManagement.sln
+dotnet restore DeepFry.sln
+dotnet build DeepFry.sln
 ```
 
 Build ke folder verifikasi terpisah berguna ketika EXE Debug sedang berjalan:
 
 ```powershell
-dotnet build LabManagement.sln `
+dotnet build DeepFry.sln `
   -p:OutputPath="$PWD\.verify\solution\" `
   -p:UseAppHost=false
 ```
@@ -75,13 +75,13 @@ dotnet build LabManagement.sln `
 ## Test
 
 ```powershell
-dotnet build tests\LabManagement.Host.LifecycleTests\LabManagement.Host.LifecycleTests.csproj `
+dotnet build tests\DeepFry.Host.LifecycleTests\DeepFry.Host.LifecycleTests.csproj `
   -p:OutputPath="$PWD\.verify\tests\" `
   -p:UseAppHost=false
 
-dotnet .\.verify\tests\LabManagement.Host.LifecycleTests.dll
-dotnet .\.verify\tests\LabManagement.Host.LifecycleTests.dll --ui-startup
-dotnet .\.verify\tests\LabManagement.Host.LifecycleTests.dll --ui-layout
+dotnet .\.verify\tests\DeepFry.Host.LifecycleTests.dll
+dotnet .\.verify\tests\DeepFry.Host.LifecycleTests.dll --ui-startup
+dotnet .\.verify\tests\DeepFry.Host.LifecycleTests.dll --ui-layout
 ```
 
 Test jaringan mencakup arah koneksi baru: Host mencari listener Client, menerima
@@ -89,9 +89,9 @@ REGISTER/HEARTBEAT, dan mengirim command dengan response yang sesuai request ID.
 
 ## Test satu PC
 
-1. Jalankan `LabManagement.Client` dari Visual Studio atau EXE publish.
+1. Jalankan `DeepFry.Client` dari Visual Studio atau EXE publish.
 2. Izinkan UAC dan Windows Firewall bila diminta.
-3. Jalankan `LabManagement.Host`.
+3. Jalankan `DeepFry.Host`.
 4. Buat/login password Host.
 5. Client akan ditemukan melalui `127.0.0.1` dalam beberapa detik.
 
@@ -127,7 +127,7 @@ Target: Windows x64, self-contained, single-file, trimming/AOT/ReadyToRun OFF.
 ### Host
 
 ```powershell
-dotnet publish LabManagement.Host\LabManagement.Host.csproj `
+dotnet publish DeepFry.Host\DeepFry.Host.csproj `
   -c Release -r win-x64 --self-contained true `
   -o .\publish\Host `
   -p:PublishSingleFile=true `
@@ -139,7 +139,7 @@ dotnet publish LabManagement.Host\LabManagement.Host.csproj `
 ### Client
 
 ```powershell
-dotnet publish LabManagement.Client\LabManagement.Client.csproj `
+dotnet publish DeepFry.Client\DeepFry.Client.csproj `
   -c Release -r win-x64 --self-contained true `
   -o .\publish\Client `
   -p:PublishSingleFile=true `
@@ -148,7 +148,7 @@ dotnet publish LabManagement.Client\LabManagement.Client.csproj `
   -p:PublishReadyToRun=false
 ```
 
-Salin `scripts\Install-LabManagementClient.ps1` ke paket Client jika mode
+Salin `scripts\Install-DeepFryClient.ps1` ke paket Client jika mode
 Windows Service akan digunakan.
 
 ## Penggunaan di lab
@@ -156,7 +156,7 @@ Windows Service akan digunakan.
 ### Host
 
 1. Letakkan Host pada PC dengan IPv4 `10.x.x.90`.
-2. Jalankan `LabManagement.Host.exe`.
+2. Jalankan `DeepFry.Host.exe`.
 3. Buat password pada penggunaan pertama.
 4. Isi nama ruangan melalui **Lab Settings**.
 5. Host otomatis memindai `.1` sampai `.89` setiap beberapa detik.
@@ -167,7 +167,7 @@ oleh Host menuju Client.
 ### Client langsung
 
 1. Ekstrak paket Client ke PC mahasiswa.
-2. Jalankan `LabManagement.Client.exe` sebagai Administrator.
+2. Jalankan `DeepFry.Client.exe` sebagai Administrator.
 3. Terima prompt UAC. Firewall rule TCP 5020 untuk `LocalSubnet` dibuat otomatis.
 4. Biarkan aplikasi berjalan selama PC ingin dikelola dari Host.
 
@@ -178,37 +178,37 @@ Menutup Client membuat PC tersebut menjadi Offline di Host.
 Buka PowerShell Administrator:
 
 ```powershell
-.\Install-LabManagementClient.ps1 `
-  -ExecutablePath "C:\LabManagement\LabManagement.Client.exe" `
+.\Install-DeepFryClient.ps1 `
+  -ExecutablePath "C:\DeepFry\DeepFry.Client.exe" `
   -Start
 ```
 
 Periksa service:
 
 ```powershell
-Get-Service -Name "LabManagement Client"
-Restart-Service -Name "LabManagement Client"
+Get-Service -Name "DeepFry Client"
+Restart-Service -Name "DeepFry Client"
 ```
 
 ### Reset password Host yang terlupa
 
 Password Host tetap sama setelah aplikasi diperbarui karena hash password dan
 konfigurasi lab disimpan di
-`C:\ProgramData\LabManagement\host-settings.json`, bukan di folder EXE.
+`C:\ProgramData\DeepFry\host-settings.json`, bukan di folder EXE.
 Password asli tidak dapat dibaca kembali dari hash tersebut.
 
 Jika password terlupa, tutup aplikasi Host, buka PowerShell sebagai
 Administrator, lalu backup file konfigurasi dengan perintah berikut:
 
 ```powershell
-$settingsPath = 'C:\ProgramData\LabManagement\host-settings.json'
+$settingsPath = 'C:\ProgramData\DeepFry\host-settings.json'
 $backupName = 'host-settings.backup-' + `
   (Get-Date -Format 'yyyyMMdd-HHmmss') + '.json'
 
 Rename-Item -LiteralPath $settingsPath -NewName $backupName
 ```
 
-Jalankan kembali `LabManagement.Host.exe`. Host akan meminta pembuatan password
+Jalankan kembali `DeepFry.Host.exe`. Host akan meminta pembuatan password
 baru seperti pada penggunaan pertama. Nama lab juga perlu diisi ulang melalui
 **Lab Settings**. File konfigurasi lama hanya diubah namanya sehingga masih
 dapat dipulihkan jika diperlukan.
@@ -240,8 +240,8 @@ menentukan status kolom ini.
 Saat status menjadi `Unknown`, ambil kedua log berikut setelah klik **Refresh
 UWF Status**:
 
-- Host: `C:\ProgramData\LabManagement\logs\host.log`
-- Client: `C:\ProgramData\LabManagement\logs\client.log`
+- Host: `C:\ProgramData\DeepFry\logs\host.log`
+- Client: `C:\ProgramData\DeepFry\logs\client.log`
 
 Keduanya mencatat hostname, state hasil parser, `FilterEnabled`,
 `DriveCProtected`, serta output mentah stdout/stderr dari `uwfmgr.exe`. File

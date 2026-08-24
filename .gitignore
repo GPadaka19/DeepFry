@@ -18,7 +18,7 @@ publish/
 *.sln.iml
 
 # Local secrets and development overrides
-LabManagement.Client/.env
+DeepFry.Client/.env
 *.env.local
 
 # Logs and temporary files
