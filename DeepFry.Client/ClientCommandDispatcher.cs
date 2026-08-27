@@ -43,10 +43,10 @@ public sealed class ClientCommandDispatcher : IClientCommandDispatcher
                     await _uwfManager.GetStatusAsync(cancellationToken)),
                 "uwf.lock" => ResponseMessage.CreateSuccess(
                     request.RequestId,
-                    await _uwfManager.LockDriveCAsync(cancellationToken)),
+                    await _uwfManager.LockAsync(cancellationToken)),
                 "uwf.unlock" => ResponseMessage.CreateSuccess(
                     request.RequestId,
-                    await _uwfManager.UnlockDriveCAsync(cancellationToken)),
+                    await _uwfManager.UnlockAsync(cancellationToken)),
                 "system.restart" => ResponseMessage.CreateSuccess(
                     request.RequestId,
                     await _systemPowerManager.RestartAsync(cancellationToken)),

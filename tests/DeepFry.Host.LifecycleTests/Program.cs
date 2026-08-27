@@ -428,7 +428,6 @@ static void TestUwfStatusParserReadsFilterState()
         enabledStatus.FilterEnabled == true &&
         enabledStatus.FilterEnabledNextSession == true &&
         enabledStatus.NextSessionState == UwfState.Locked &&
-        enabledStatus.DriveCProtected == true &&
         filterOnlyEnabledStatus.State == UwfState.Locked &&
         filterOnlyEnabledStatus.FilterEnabled == true &&
         filterOnlyEnabledStatus.NextSessionState == UwfState.Unknown &&
@@ -437,10 +436,8 @@ static void TestUwfStatusParserReadsFilterState()
         disabledStatus.NextSessionState == UwfState.Locked &&
         unprotectedVolumeStatus.State == UwfState.Locked &&
         unprotectedVolumeStatus.FilterEnabled == true &&
-        unprotectedVolumeStatus.DriveCProtected == false &&
         unprotectedVolumeStatus.NextSessionState == UwfState.Locked &&
         nextSessionOnlyStatus.State == UwfState.Locked &&
-        nextSessionOnlyStatus.DriveCProtected is null &&
         nextSessionOnlyStatus.NextSessionState == UwfState.Unknown,
         "UWF status parser did not derive On or Off from the filter state " +
         "in the Current Session and Next Session settings.");
@@ -481,7 +478,6 @@ static void TestUwfStatusParserHandlesConsoleControlCharacters()
     Assert(
         status.State == UwfState.Locked &&
         status.FilterEnabled == true &&
-        status.DriveCProtected == false &&
         status.NextSessionState == UwfState.Unlocked &&
         status.FilterEnabledNextSession == false,
         "UWF status parser did not tolerate console control characters " +
@@ -533,14 +529,13 @@ static async Task TestUwfSimulationFixtureAsync()
         Assert(
             status.State == UwfState.Unlocked &&
             status.FilterEnabled == false &&
-            status.DriveCProtected == false &&
             status.NextSessionState == UwfState.Locked &&
             status.FilterEnabledNextSession == true &&
             status.Details.Contains("Simulated", StringComparison.Ordinal),
             "UWF simulation did not return the filter state.");
 
         await AssertThrowsAsync<InvalidOperationException>(
-            manager.LockDriveCAsync(CancellationToken.None));
+            manager.LockAsync(CancellationToken.None));
 
         var productionManager = new UwfManager(
             new TestHostEnvironment(Environments.Production),
@@ -1243,18 +1238,17 @@ file sealed class FakeUwfManager : IUwfManager
         return Task.FromResult(new UwfStatusPayload
         {
             State = UwfState.Locked,
-            FilterEnabled = true,
-            DriveCProtected = true
+            FilterEnabled = true
         });
     }
 
-    public Task<CommandResultPayload> LockDriveCAsync(
+    public Task<CommandResultPayload> LockAsync(
         CancellationToken cancellationToken)
     {
         return Task.FromResult(new CommandResultPayload());
     }
 
-    public Task<CommandResultPayload> UnlockDriveCAsync(
+    public Task<CommandResultPayload> UnlockAsync(
         CancellationToken cancellationToken)
     {
         return Task.FromResult(new CommandResultPayload());

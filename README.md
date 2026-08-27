@@ -106,17 +106,18 @@ Client tetap menjalankan `uwfmgr.exe`.
 
 1. Build atau extract paket Client.
 2. Buka PowerShell sebagai Administrator pada folder Client.
-3. Jalankan fixture `Un-protected`:
+3. Jalankan fixture `FilterOn`:
 
 ```powershell
-.\SimulationFixtures\Start-UwfSimulation.ps1 -State Unprotected
+.\SimulationFixtures\Start-UwfSimulation.ps1 -State FilterOn
 ```
 
-   Gunakan `-State Protected` untuk menguji kondisi sebaliknya.
-
    Gunakan `-State FilterOff` untuk menguji `Filter state` `OFF` pada Current
-   Session dan `ON` pada Next Session, sehingga kolom Filter (Current) dan
-   Filter (Next) menunjukkan nilai yang berbeda.
+   dan Next Session (kedua kolom menunjukkan `OFF`).
+
+   Gunakan `-State FilterPending` untuk menguji Current `OFF` menuju Next
+   `ON` — kondisi setelah perintah Lock sebelum restart — sehingga kolom
+   Filter (Current) dan Filter (Next) menunjukkan nilai yang berbeda.
 4. Jalankan Host pada PC yang sama, tunggu Client terdeteksi di `127.0.0.1`,
    lalu klik **Refresh UWF Status**.
 
@@ -289,9 +290,9 @@ UWF Status**:
 - Client: `C:\ProgramData\DeepFry\logs\client.log`
 
 Keduanya mencatat hostname, state hasil parser, `FilterEnabled`,
-`DriveCProtected`, serta output mentah stdout/stderr dari `uwfmgr.exe`. File
-disimpan sampai 5 MB dan satu salinan sebelumnya tersedia dengan akhiran
-`.previous`.
+`FilterEnabledNextSession`, serta output mentah stdout/stderr dari
+`uwfmgr.exe`. File disimpan sampai 5 MB dan satu salinan sebelumnya tersedia
+dengan akhiran `.previous`.
 
 Perintah Lock/Unlock hanya mengubah konfigurasi UWF dan tidak pernah melakukan
 restart otomatis. Untuk menerapkan perubahan, pilih PC target, klik

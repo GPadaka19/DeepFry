@@ -14,8 +14,8 @@ Volume 38c97866-e219-45c5-a3fc-6e2630a87435 [C:]
 Next Session Settings
 
 FILTER SETTINGS
-    Filter state:     ON
+    Filter state:     OFF
 
 VOLUME SETTINGS
 Volume 38c97866-e219-45c5-a3fc-6e2630a87435 [C:]
-    Volume state:     Protected
+    Volume state:     Un-protected

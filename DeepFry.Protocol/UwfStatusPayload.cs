@@ -10,8 +10,6 @@ public sealed class UwfStatusPayload
 
     public bool? FilterEnabledNextSession { get; init; }
 
-    public bool? DriveCProtected { get; init; }
-
     public bool RestartRequired { get; init; }
 
     public string Details { get; init; } = string.Empty;

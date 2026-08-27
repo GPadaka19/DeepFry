@@ -10,7 +10,6 @@ namespace DeepFry.Client;
 
 public sealed class UwfManager : IUwfManager
 {
-    private const string DriveC = "C:";
     private readonly IHostEnvironment _environment;
     private readonly IConfiguration _configuration;
     private readonly ILogger<UwfManager> _logger;
@@ -107,7 +106,6 @@ public sealed class UwfManager : IUwfManager
         bool? nextFilterEnabled = FindBoolean(
             nextSession,
             "filter\\s+state");
-        bool? driveCProtected = FindDriveCProtection(currentSession);
 
         UwfState state = ToState(filterEnabled);
         UwfState nextState = ToState(nextFilterEnabled);
@@ -118,7 +116,6 @@ public sealed class UwfManager : IUwfManager
             NextSessionState = nextState,
             FilterEnabled = filterEnabled,
             FilterEnabledNextSession = nextFilterEnabled,
-            DriveCProtected = driveCProtected,
             Details = details
         };
     }
@@ -131,52 +128,49 @@ public sealed class UwfManager : IUwfManager
             _ => UwfState.Unknown
         };
 
-    public async Task<CommandResultPayload> LockDriveCAsync(
+    public async Task<CommandResultPayload> LockAsync(
         CancellationToken cancellationToken)
     {
         EnsureUwfControlIsAvailable();
 
-        UwfCommandResult protect = await RunAsync(
-            ["volume", "protect", DriveC],
-            cancellationToken);
         UwfCommandResult enable = await RunAsync(
             ["filter", "enable"],
             cancellationToken);
 
-        string details = JoinOutput(protect, enable);
+        string details = JoinOutput(enable);
 
-        if (protect.ExitCode != 0 || enable.ExitCode != 0)
+        if (enable.ExitCode != 0)
         {
             throw new InvalidOperationException(
-                $"Unable to lock drive C:. {details}");
+                $"Unable to enable the UWF filter. {details}");
         }
 
         return new CommandResultPayload
         {
             RestartRequired = true,
-            Details = "Drive C: will be protected after restart."
+            Details = "UWF filter will be enabled after restart."
         };
     }
 
-    public async Task<CommandResultPayload> UnlockDriveCAsync(
+    public async Task<CommandResultPayload> UnlockAsync(
         CancellationToken cancellationToken)
     {
         EnsureUwfControlIsAvailable();
 
-        UwfCommandResult unprotect = await RunAsync(
-            ["volume", "unprotect", DriveC],
+        UwfCommandResult disable = await RunAsync(
+            ["filter", "disable"],
             cancellationToken);
 
-        if (unprotect.ExitCode != 0)
+        if (disable.ExitCode != 0)
         {
             throw new InvalidOperationException(
-                $"Unable to unlock drive C:. {JoinOutput(unprotect)}");
+                $"Unable to disable the UWF filter. {JoinOutput(disable)}");
         }
 
         return new CommandResultPayload
         {
             RestartRequired = true,
-            Details = "Drive C: will be unprotected after restart."
+            Details = "UWF filter will be disabled after restart."
         };
     }
 
@@ -229,23 +223,6 @@ public sealed class UwfManager : IUwfManager
             return null;
 
         return ParseBooleanValue(match.Groups["value"].Value);
-    }
-
-    private static bool? FindDriveCProtection(string text)
-    {
-        Match match = Regex.Match(
-            text,
-            "^[ \\t]*volume[^\\r\\n]*\\[[ \\t]*c:[ \\t]*\\]" +
-            "[^\\r\\n]*\\r?\\n[ \\t]*" +
-            "volume\\s+state\\s*:\\s*" +
-            "(?<value>protected|un-?protected)\\b",
-            RegexOptions.IgnoreCase |
-            RegexOptions.Multiline |
-            RegexOptions.CultureInvariant);
-
-        return match.Success
-            ? ParseBooleanValue(match.Groups["value"].Value)
-            : null;
     }
 
     private static string ExtractCurrentSession(string output)
@@ -350,8 +327,7 @@ public sealed class UwfManager : IUwfManager
             ? "No status payload was produced."
             : $"State={status.State}; NextSessionState={status.NextSessionState}; " +
               $"FilterEnabled={status.FilterEnabled}; " +
-              $"FilterEnabledNextSession={status.FilterEnabledNextSession}; " +
-              $"DriveCProtected={status.DriveCProtected}";
+              $"FilterEnabledNextSession={status.FilterEnabledNextSession}";
         string details = $"Source={source}{Environment.NewLine}" +
             $"ExitCode={exitCode}{Environment.NewLine}" +
             $"{parsedStatus}{Environment.NewLine}" +

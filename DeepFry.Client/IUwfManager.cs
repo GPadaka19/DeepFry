@@ -7,9 +7,9 @@ public interface IUwfManager
     Task<UwfStatusPayload> GetStatusAsync(
         CancellationToken cancellationToken);
 
-    Task<CommandResultPayload> LockDriveCAsync(
+    Task<CommandResultPayload> LockAsync(
         CancellationToken cancellationToken);
 
-    Task<CommandResultPayload> UnlockDriveCAsync(
+    Task<CommandResultPayload> UnlockAsync(
         CancellationToken cancellationToken);
 }
