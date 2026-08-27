@@ -621,29 +621,35 @@ static void TestMainWindowLayout()
                 "DataGrid row header still creates a left-side gutter.");
             Assert(
                 grid.Columns[1] is DataGridTextColumn computer &&
-                computer.Width.UnitType == DataGridLengthUnitType.Auto &&
+                computer.Width.UnitType == DataGridLengthUnitType.Star &&
+                computer.Width.Value == 1.4 &&
                 grid.Columns[2] is DataGridTextColumn ip &&
-                ip.Width.UnitType == DataGridLengthUnitType.Auto &&
+                ip.Width.UnitType == DataGridLengthUnitType.Star &&
+                ip.Width.Value == 0.9 &&
                 grid.Columns[3] is DataGridTextColumn connection &&
-                connection.Width.UnitType == DataGridLengthUnitType.Auto,
-                "The text columns are not auto-sized to their content.");
+                connection.Width.UnitType == DataGridLengthUnitType.Star &&
+                connection.Width.Value == 0.7,
+                "The text columns are not proportionally sized.");
             Assert(
                 grid.Columns[4] is DataGridTextColumn uwfColumn &&
                 uwfColumn.Binding is System.Windows.Data.Binding uwfBinding &&
                 uwfBinding.Path.Path == "UwfStatusText" &&
                 uwfColumn.Header.ToString() == "Filter (Current)" &&
-                uwfColumn.Width.UnitType == DataGridLengthUnitType.Auto,
+                uwfColumn.Width.UnitType == DataGridLengthUnitType.Star &&
+                uwfColumn.Width.Value == 0.9,
                 "The Filter (Current) column is not bound to the filter state text.");
             Assert(
                 grid.Columns[5] is DataGridTextColumn uwfNextColumn &&
                 uwfNextColumn.Binding is System.Windows.Data.Binding uwfNextBinding &&
                 uwfNextBinding.Path.Path == "UwfStatusAfterRestartText" &&
                 uwfNextColumn.Header.ToString() == "Filter (Next)" &&
-                uwfNextColumn.Width.UnitType == DataGridLengthUnitType.Auto,
+                uwfNextColumn.Width.UnitType == DataGridLengthUnitType.Star &&
+                uwfNextColumn.Width.Value == 0.9,
                 "The Filter (Next) column is not bound to the next filter state text.");
             Assert(
                 grid.Columns[6] is DataGridTemplateColumn lastResult &&
-                lastResult.Width.UnitType == DataGridLengthUnitType.Star,
+                lastResult.Width.UnitType == DataGridLengthUnitType.Star &&
+                lastResult.Width.Value == 2.5,
                 "Last Result is not a responsive wrapping column.");
         }
         catch (Exception ex)

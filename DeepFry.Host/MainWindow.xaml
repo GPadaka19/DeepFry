@@ -92,11 +92,11 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
 
-                <DataGridTextColumn Header="Computer" Binding="{Binding Hostname}" IsReadOnly="True" Width="Auto"/>
-                <DataGridTextColumn Header="IP Address" Binding="{Binding IpAddress}" IsReadOnly="True" Width="Auto"/>
-                <DataGridTextColumn Header="Connection" Binding="{Binding Status}" IsReadOnly="True" Width="Auto"/>
-                <DataGridTextColumn Header="Filter (Current)" Binding="{Binding UwfStatusText}" IsReadOnly="True" Width="Auto"/>
-                <DataGridTextColumn Header="Filter (Next)" Binding="{Binding UwfStatusAfterRestartText}" IsReadOnly="True" Width="Auto"/>
+                <DataGridTextColumn Header="Computer" Binding="{Binding Hostname}" IsReadOnly="True" Width="1.4*"/>
+                <DataGridTextColumn Header="IP Address" Binding="{Binding IpAddress}" IsReadOnly="True" Width="0.9*"/>
+                <DataGridTextColumn Header="Connection" Binding="{Binding Status}" IsReadOnly="True" Width="0.7*"/>
+                <DataGridTextColumn Header="Filter (Current)" Binding="{Binding UwfStatusText}" IsReadOnly="True" Width="0.9*"/>
+                <DataGridTextColumn Header="Filter (Next)" Binding="{Binding UwfStatusAfterRestartText}" IsReadOnly="True" Width="0.9*"/>
                 <DataGridTemplateColumn Header="Last Result" IsReadOnly="True" MinWidth="240" Width="2.5*">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
