@@ -113,6 +113,10 @@ Client tetap menjalankan `uwfmgr.exe`.
 ```
 
    Gunakan `-State Protected` untuk menguji kondisi sebaliknya.
+
+   Gunakan `-State FilterOff` untuk menguji `Filter state` `OFF` pada Current
+   Session dan `ON` pada Next Session, sehingga kolom Filter (Current) dan
+   Filter (Next) menunjukkan nilai yang berbeda.
 4. Jalankan Host pada PC yang sama, tunggu Client terdeteksi di `127.0.0.1`,
    lalu klik **Refresh UWF Status**.
 
@@ -273,11 +277,10 @@ Jika gagal:
 
 UWF wajib diuji pada image Windows lab sebenarnya sebelum operasi massal.
 
-Kolom **UWF** pada Host mengikuti `Volume state` drive `[C:]` dari bagian
-Current Session pada output `uwfmgr.exe get-config`: `Protected` ditampilkan
-sebagai `Protected`, sedangkan `Un-protected` atau `Unprotected` ditampilkan
-sebagai `Un-protected`. Konfigurasi Next Session dan volume selain C tidak
-menentukan status kolom ini.
+Kolom **Filter (Current)** dan **Filter (Next)** pada Host menampilkan
+`Filter state` dari bagian Current Session dan Next Session pada output
+`uwfmgr.exe get-config`, dengan nilai apa adanya (`ON` atau `OFF`). Status
+volume per-drive tidak lagi menentukan kolom ini.
 
 Saat status menjadi `Unknown`, ambil kedua log berikut setelah klik **Refresh
 UWF Status**:

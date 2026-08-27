@@ -104,17 +104,20 @@ public sealed class UwfManager : IUwfManager
         bool? filterEnabled = FindBoolean(
             currentSession,
             "filter\\s+state");
+        bool? nextFilterEnabled = FindBoolean(
+            nextSession,
+            "filter\\s+state");
         bool? driveCProtected = FindDriveCProtection(currentSession);
-        bool? nextDriveCProtected = FindDriveCProtection(nextSession);
 
-        UwfState state = ToState(driveCProtected);
-        UwfState nextState = ToState(nextDriveCProtected);
+        UwfState state = ToState(filterEnabled);
+        UwfState nextState = ToState(nextFilterEnabled);
 
         return new UwfStatusPayload
         {
             State = state,
             NextSessionState = nextState,
             FilterEnabled = filterEnabled,
+            FilterEnabledNextSession = nextFilterEnabled,
             DriveCProtected = driveCProtected,
             Details = details
         };
@@ -345,7 +348,9 @@ public sealed class UwfManager : IUwfManager
     {
         string parsedStatus = status is null
             ? "No status payload was produced."
-            : $"State={status.State}; FilterEnabled={status.FilterEnabled}; " +
+            : $"State={status.State}; NextSessionState={status.NextSessionState}; " +
+              $"FilterEnabled={status.FilterEnabled}; " +
+              $"FilterEnabledNextSession={status.FilterEnabledNextSession}; " +
               $"DriveCProtected={status.DriveCProtected}";
         string details = $"Source={source}{Environment.NewLine}" +
             $"ExitCode={exitCode}{Environment.NewLine}" +

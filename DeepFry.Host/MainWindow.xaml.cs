@@ -413,6 +413,7 @@ namespace DeepFry.Host
                         $"State={status.State}{Environment.NewLine}" +
                         $"NextSessionState={status.NextSessionState}{Environment.NewLine}" +
                         $"FilterEnabled={status.FilterEnabled}{Environment.NewLine}" +
+                        $"FilterEnabledNextSession={status.FilterEnabledNextSession}{Environment.NewLine}" +
                         $"DriveCProtected={status.DriveCProtected}{Environment.NewLine}" +
                         $"Details:{Environment.NewLine}{status.Details}");
                     return;

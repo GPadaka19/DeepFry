@@ -1,7 +1,7 @@
 #Requires -RunAsAdministrator
 [CmdletBinding()]
 param(
-    [ValidateSet('Protected', 'Unprotected')]
+    [ValidateSet('Protected', 'Unprotected', 'FilterOff')]
     [string]$State = 'Unprotected',
 
     [string]$ClientExecutablePath = ''

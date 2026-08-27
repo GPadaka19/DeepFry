@@ -8,6 +8,8 @@ public sealed class UwfStatusPayload
 
     public bool? FilterEnabled { get; init; }
 
+    public bool? FilterEnabledNextSession { get; init; }
+
     public bool? DriveCProtected { get; init; }
 
     public bool RestartRequired { get; init; }

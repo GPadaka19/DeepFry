@@ -63,8 +63,8 @@ public sealed class ClientInfo : INotifyPropertyChanged
 
     public string UwfStatusText => _uwfState switch
     {
-        UwfState.Locked => "Protected",
-        UwfState.Unlocked => "Un-protected",
+        UwfState.Locked => "ON",
+        UwfState.Unlocked => "OFF",
         UwfState.Checking => "Checking...",
         _ => "Unknown"
     };
@@ -85,8 +85,8 @@ public sealed class ClientInfo : INotifyPropertyChanged
 
     public string UwfStatusAfterRestartText => _uwfNextSessionState switch
     {
-        UwfState.Locked => "Protected",
-        UwfState.Unlocked => "Un-protected",
+        UwfState.Locked => "ON",
+        UwfState.Unlocked => "OFF",
         UwfState.Checking => "Checking...",
         _ => "Unknown"
     };

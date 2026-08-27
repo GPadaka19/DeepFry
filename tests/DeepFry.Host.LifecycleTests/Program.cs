@@ -39,7 +39,7 @@ else
     TestClientDiagnosticLog();
     TestUwfStatusResultFormatting();
     TestUwfStatusColumnFormatting();
-    TestUwfStatusParserUsesCurrentDriveCVolumeState();
+    TestUwfStatusParserReadsFilterState();
     TestUwfStatusParserHandlesConsoleControlCharacters();
     await TestUwfSimulationFixtureAsync();
     await TestCommandDispatcherAsync();
@@ -317,21 +317,21 @@ static void TestUwfStatusColumnFormatting()
         changedProperties.Add(args.PropertyName);
 
     client.UwfState = UwfState.Locked;
-    bool protectedStateIsDisplayed =
-        client.UwfStatusText == "Protected" &&
+    bool lockedStateIsDisplayed =
+        client.UwfStatusText == "ON" &&
         changedProperties.Contains("UwfStatusText");
 
     changedProperties.Clear();
     client.UwfState = UwfState.Unlocked;
 
     Assert(
-        protectedStateIsDisplayed &&
-        client.UwfStatusText == "Un-protected" &&
+        lockedStateIsDisplayed &&
+        client.UwfStatusText == "OFF" &&
         changedProperties.Contains("UwfStatusText"),
-        "The Host UWF column does not expose the current Volume state label.");
+        "The Host UWF column does not expose the current filter state ON or OFF.");
 }
 
-static void TestUwfStatusParserUsesCurrentDriveCVolumeState()
+static void TestUwfStatusParserReadsFilterState()
 {
     const string capturedProtectedOutput = """
         Unified Write Filter Configuration Utility version 10.0.26200
@@ -426,20 +426,24 @@ static void TestUwfStatusParserUsesCurrentDriveCVolumeState()
     Assert(
         enabledStatus.State == UwfState.Locked &&
         enabledStatus.FilterEnabled == true &&
+        enabledStatus.FilterEnabledNextSession == true &&
+        enabledStatus.NextSessionState == UwfState.Locked &&
         enabledStatus.DriveCProtected == true &&
-        filterOnlyEnabledStatus.State == UwfState.Unknown &&
+        filterOnlyEnabledStatus.State == UwfState.Locked &&
         filterOnlyEnabledStatus.FilterEnabled == true &&
-        disabledStatus.State == UwfState.Unknown &&
+        filterOnlyEnabledStatus.NextSessionState == UwfState.Unknown &&
+        disabledStatus.State == UwfState.Unlocked &&
         disabledStatus.FilterEnabled == false &&
-        unprotectedVolumeStatus.State == UwfState.Unlocked &&
+        disabledStatus.NextSessionState == UwfState.Locked &&
+        unprotectedVolumeStatus.State == UwfState.Locked &&
         unprotectedVolumeStatus.FilterEnabled == true &&
         unprotectedVolumeStatus.DriveCProtected == false &&
         unprotectedVolumeStatus.NextSessionState == UwfState.Locked &&
-        nextSessionOnlyStatus.State == UwfState.Unknown &&
+        nextSessionOnlyStatus.State == UwfState.Locked &&
         nextSessionOnlyStatus.DriveCProtected is null &&
-        nextSessionOnlyStatus.NextSessionState == UwfState.Locked,
-        "UWF status parser did not derive On or Off from drive C in the " +
-        "Current Session volume settings.");
+        nextSessionOnlyStatus.NextSessionState == UwfState.Unknown,
+        "UWF status parser did not derive On or Off from the filter state " +
+        "in the Current Session and Next Session settings.");
 }
 
 static void TestUwfStatusParserHandlesConsoleControlCharacters()
@@ -455,6 +459,9 @@ static void TestUwfStatusParserHandlesConsoleControlCharacters()
             Volume state:     Un-protected
 
         Next Session Settings
+
+        FILTER SETTINGS
+            Filter state:     OFF
 
         VOLUME SETTINGS
         Volume 38c97866-e219-45c5-a3fc-6e2630a87435 [C:]
@@ -472,11 +479,13 @@ static void TestUwfStatusParserHandlesConsoleControlCharacters()
         consoleOutput.ToString());
 
     Assert(
-        status.State == UwfState.Unlocked &&
+        status.State == UwfState.Locked &&
+        status.FilterEnabled == true &&
         status.DriveCProtected == false &&
-        status.NextSessionState == UwfState.Locked,
+        status.NextSessionState == UwfState.Unlocked &&
+        status.FilterEnabledNextSession == false,
         "UWF status parser did not tolerate console control characters " +
-        "in the current Volume state output.");
+        "in the filter and volume state output.");
 }
 
 static async Task TestUwfSimulationFixtureAsync()
@@ -490,11 +499,17 @@ static async Task TestUwfSimulationFixtureAsync()
             """
             Current Session Settings
 
+            FILTER SETTINGS
+                Filter state:     OFF
+
             VOLUME SETTINGS
             Volume 38c97866-e219-45c5-a3fc-6e2630a87435 [C:]
                 Volume state:     Un-protected
 
             Next Session Settings
+
+            FILTER SETTINGS
+                Filter state:     ON
 
             VOLUME SETTINGS
             Volume 38c97866-e219-45c5-a3fc-6e2630a87435 [C:]
@@ -517,9 +532,12 @@ static async Task TestUwfSimulationFixtureAsync()
 
         Assert(
             status.State == UwfState.Unlocked &&
+            status.FilterEnabled == false &&
             status.DriveCProtected == false &&
+            status.NextSessionState == UwfState.Locked &&
+            status.FilterEnabledNextSession == true &&
             status.Details.Contains("Simulated", StringComparison.Ordinal),
-            "UWF simulation did not return the Current Session volume state.");
+            "UWF simulation did not return the filter state.");
 
         await AssertThrowsAsync<InvalidOperationException>(
             manager.LockDriveCAsync(CancellationToken.None));
@@ -593,7 +611,7 @@ static void TestMainWindowLayout()
             DataGrid grid = (DataGrid)window.FindName("ClientGrid");
 
             Assert(
-                window.Title == "Deep Fry v3.3.0",
+                window.Title == "Deep Fry v3.3.1",
                 "Host title no longer preserves the Deep Fry identity.");
             Assert(
                 window.FindName("RestartSelectedButton") is Button,
@@ -602,12 +620,29 @@ static void TestMainWindowLayout()
                 grid.RowHeaderWidth == 0,
                 "DataGrid row header still creates a left-side gutter.");
             Assert(
+                grid.Columns[1] is DataGridTextColumn computer &&
+                computer.Width.UnitType == DataGridLengthUnitType.Auto &&
+                grid.Columns[2] is DataGridTextColumn ip &&
+                ip.Width.UnitType == DataGridLengthUnitType.Auto &&
+                grid.Columns[3] is DataGridTextColumn connection &&
+                connection.Width.UnitType == DataGridLengthUnitType.Auto,
+                "The text columns are not auto-sized to their content.");
+            Assert(
                 grid.Columns[4] is DataGridTextColumn uwfColumn &&
                 uwfColumn.Binding is System.Windows.Data.Binding uwfBinding &&
-                uwfBinding.Path.Path == "UwfStatusText",
-                "The UWF column is not bound to the current Volume state text.");
+                uwfBinding.Path.Path == "UwfStatusText" &&
+                uwfColumn.Header.ToString() == "Filter (Current)" &&
+                uwfColumn.Width.UnitType == DataGridLengthUnitType.Auto,
+                "The Filter (Current) column is not bound to the filter state text.");
             Assert(
-                grid.Columns[5] is DataGridTemplateColumn lastResult &&
+                grid.Columns[5] is DataGridTextColumn uwfNextColumn &&
+                uwfNextColumn.Binding is System.Windows.Data.Binding uwfNextBinding &&
+                uwfNextBinding.Path.Path == "UwfStatusAfterRestartText" &&
+                uwfNextColumn.Header.ToString() == "Filter (Next)" &&
+                uwfNextColumn.Width.UnitType == DataGridLengthUnitType.Auto,
+                "The Filter (Next) column is not bound to the next filter state text.");
+            Assert(
+                grid.Columns[6] is DataGridTemplateColumn lastResult &&
                 lastResult.Width.UnitType == DataGridLengthUnitType.Star,
                 "Last Result is not a responsive wrapping column.");
         }
